@@ -6,7 +6,12 @@
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --use-npm)",
       "Bash(mkdir -p /tmp/dxm_templates)",
       "Bash(cp groupProductData_1.xls template_tiktok.xlsx template_tiktok_example.xlsx /tmp/dxm_templates/)",
-      "Bash(rm groupProductData_1.xls template_tiktok.xlsx template_tiktok_example.xlsx)"
+      "Bash(rm groupProductData_1.xls template_tiktok.xlsx template_tiktok_example.xlsx)",
+      "Bash(cp /tmp/dxm_templates/* /Users/Life/Eason-Nuts/dianxiaomi_tiktokshop_product_import/)",
+      "Bash(mkdir -p /Users/Life/Eason-Nuts/dianxiaomi_tiktokshop_product_import/public)",
+      "Bash(cp /tmp/dxm_templates/template_tiktok.xlsx /Users/Life/Eason-Nuts/dianxiaomi_tiktokshop_product_import/public/)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init -d)"
     ]
   }
 }
