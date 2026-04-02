@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export PATH=\"/Users/eason/.nvm/versions/node/v24.14.0/bin:$PATH\")",
+      "Bash(npm -v)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --use-npm)",
+      "Bash(mkdir -p /tmp/dxm_templates)",
+      "Bash(cp groupProductData_1.xls template_tiktok.xlsx template_tiktok_example.xlsx /tmp/dxm_templates/)",
+      "Bash(rm groupProductData_1.xls template_tiktok.xlsx template_tiktok_example.xlsx)"
+    ]
+  }
+}
