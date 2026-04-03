@@ -1,50 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { getAccessToken } from '@/lib/tiktok-token';
 import { generateCategoryTitleVariants } from '@/lib/category-title-variants';
+import {
+  fetchCategoryPathMap,
+  generateTikTokSignature,
+  TikTokCategory,
+} from '@/lib/tiktok-category-tree';
 
 interface RecommendCategoryRequest {
   productTitle: string;
   description?: string;
   region: string;
-}
-
-/**
- * Generate TikTok Open API signature.
- * See: https://partner.tiktokshop.com/docv2/page/64f199e4defece02be598a4e
- */
-function generateSignature(
-  path: string,
-  queryParams: Record<string, string>,
-  body: string,
-  appSecret: string
-): string {
-  const sortedKeys = Object.keys(queryParams)
-    .filter((k) => k !== 'sign' && k !== 'access_token')
-    .sort();
-
-  let baseString = path;
-  for (const key of sortedKeys) {
-    baseString += key + queryParams[key];
-  }
-  baseString += body;
-
-  const signString = appSecret + baseString + appSecret;
-
-  return crypto
-    .createHmac('sha256', appSecret)
-    .update(signString)
-    .digest('hex');
-}
-
-interface TikTokCategory {
-  id: string;
-  name?: string;
-  local_name?: string;
-  parent_id?: string;
-  is_leaf?: boolean;
-  level?: number;
-  permission_statuses?: string[];
 }
 
 interface TikTokApiResponse {
@@ -54,80 +20,6 @@ interface TikTokApiResponse {
     categories?: TikTokCategory[];
     category_list?: TikTokCategory[];
   };
-}
-
-/**
- * Fetch the full TikTok category tree and return a map of id -> ancestor path (names from root to self).
- */
-async function fetchCategoryPathMap(
-  appKey: string,
-  appSecret: string,
-  shopCipher: string,
-  accessToken: string
-): Promise<Map<string, string[]>> {
-  const apiPath = '/product/202309/categories';
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-
-  const queryParams: Record<string, string> = {
-    app_key: appKey,
-    shop_cipher: shopCipher,
-    timestamp,
-    locale: 'en',
-  };
-
-  const sign = generateSignature(apiPath, queryParams, '', appSecret);
-
-  const queryString = new URLSearchParams({ ...queryParams, sign }).toString();
-  const apiUrl = `https://open-api.tiktokglobalshop.com${apiPath}?${queryString}`;
-
-  const response = await fetch(apiUrl, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-tts-access-token': accessToken,
-    },
-  });
-
-  const data = await response.json();
-
-  if (data.code !== 0) {
-    console.error('[Category Tree] API error:', data.code, data.message);
-    return new Map();
-  }
-
-  const categories: TikTokCategory[] = data.data?.category_list || data.data?.categories || [];
-
-  // Build id -> category map
-  const catMap = new Map<string, TikTokCategory>();
-  for (const cat of categories) {
-    catMap.set(String(cat.id), cat);
-  }
-
-  // Build id -> full path (names from root to self)
-  const pathMap = new Map<string, string[]>();
-
-  function buildPath(id: string): string[] {
-    if (pathMap.has(id)) return pathMap.get(id)!;
-    const cat = catMap.get(id);
-    if (!cat) return [];
-    const name = cat.local_name || cat.name || id;
-    const parentId = String(cat.parent_id || '');
-    if (!parentId || parentId === '0' || parentId === '') {
-      const path = [name];
-      pathMap.set(id, path);
-      return path;
-    }
-    const parentPath = buildPath(parentId);
-    const path = [...parentPath, name];
-    pathMap.set(id, path);
-    return path;
-  }
-
-  for (const cat of categories) {
-    buildPath(String(cat.id));
-  }
-
-  return pathMap;
 }
 
 async function requestRecommendedCategories(
@@ -155,7 +47,7 @@ async function requestRecommendedCategories(
     timestamp,
   };
 
-  const sign = generateSignature(apiPath, queryParams, bodyString, appSecret);
+  const sign = generateTikTokSignature(apiPath, queryParams, bodyString, appSecret);
   const queryString = new URLSearchParams({
     ...queryParams,
     sign,

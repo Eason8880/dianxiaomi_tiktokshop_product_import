@@ -38,9 +38,19 @@ export interface ProductGroup {
   categoryLookupTitle?: string;
   categoryLookupError?: string;
   categoryMatchedTitle?: string;
+  aiCategoryCandidates?: AICategoryCandidate[];
+  aiCategoryError?: string;
+  aiAnalyzedTitle?: string;
   recommendedCategoryId?: string;
   categoryName?: string;
   categoryPath?: string[]; // full hierarchy path from root to leaf
+}
+
+export interface AICategoryCandidate {
+  categoryId: string;
+  categoryPath: string[];
+  reason: string;
+  score?: number;
 }
 
 // Category recommendation result

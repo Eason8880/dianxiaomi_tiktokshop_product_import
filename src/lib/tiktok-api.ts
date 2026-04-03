@@ -1,4 +1,4 @@
-import { ProductGroup, CategoryRecommendation } from '@/types';
+import { AICategoryCandidate, ProductGroup, CategoryRecommendation } from '@/types';
 
 export interface CategoryFetchResponse {
   categories: CategoryRecommendation[];
@@ -7,6 +7,17 @@ export interface CategoryFetchResponse {
 }
 
 export interface CategoryLookupResult {
+  group: ProductGroup;
+  error?: string;
+}
+
+export interface AICategoryFetchResponse {
+  candidates: AICategoryCandidate[];
+  analyzedTitle?: string;
+  model?: string;
+}
+
+export interface AICategoryLookupResult {
   group: ProductGroup;
   error?: string;
 }
@@ -47,6 +58,43 @@ export async function fetchRecommendedCategory(
     attemptedTitles: Array.isArray(data.attemptedTitles)
       ? data.attemptedTitles.filter((title: unknown): title is string => typeof title === 'string')
       : undefined,
+  };
+}
+
+export async function analyzeCategoryWithAI(
+  productTitle: string,
+  region: string
+): Promise<AICategoryFetchResponse> {
+  const response = await fetch('/api/tiktok-category-ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productTitle,
+      categoryLookupTitle: productTitle,
+      region,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+
+  return {
+    candidates: Array.isArray(data.candidates)
+      ? data.candidates
+          .filter((item: Record<string, unknown>) => item.categoryId && Array.isArray(item.categoryPath))
+          .map((item: Record<string, unknown>) => ({
+            categoryId: String(item.categoryId || ''),
+            categoryPath: Array.isArray(item.categoryPath)
+              ? item.categoryPath.filter((seg: unknown): seg is string => typeof seg === 'string')
+              : [],
+            reason: String(item.reason || ''),
+            score: typeof item.score === 'number' ? item.score : undefined,
+          }))
+      : [],
+    analyzedTitle: typeof data.analyzedTitle === 'string' ? data.analyzedTitle : undefined,
+    model: typeof data.model === 'string' ? data.model : undefined,
   };
 }
 
@@ -99,6 +147,9 @@ export async function fetchCategoryForGroup(
         categoryPath: bestCategory.categoryPath,
         categoryLookupError: undefined,
         categoryMatchedTitle: result.matchedTitle,
+        aiCategoryCandidates: undefined,
+        aiCategoryError: undefined,
+        aiAnalyzedTitle: undefined,
       },
     };
   } catch (err) {
@@ -113,6 +164,47 @@ export async function fetchCategoryForGroup(
   }
 }
 
+export async function analyzeCategoryForGroupWithAI(
+  group: ProductGroup,
+  region: string
+): Promise<AICategoryLookupResult> {
+  const lookupTitle = group.categoryLookupTitle || group.productTitle;
+
+  try {
+    const result = await analyzeCategoryWithAI(lookupTitle, region);
+    if (result.candidates.length === 0) {
+      return {
+        group: {
+          ...group,
+          aiCategoryCandidates: undefined,
+          aiCategoryError: 'AI 未返回可用候选类目',
+          aiAnalyzedTitle: result.analyzedTitle,
+        },
+        error: 'AI 未返回可用候选类目',
+      };
+    }
+
+    return {
+      group: {
+        ...group,
+        aiCategoryCandidates: result.candidates,
+        aiCategoryError: undefined,
+        aiAnalyzedTitle: result.analyzedTitle,
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'AI 类目分析失败';
+    return {
+      group: {
+        ...group,
+        aiCategoryCandidates: undefined,
+        aiCategoryError: message,
+      },
+      error: message,
+    };
+  }
+}
+
 /**
  * Batch fetch categories for all product groups with rate limiting.
  * Returns updated groups with recommendedCategoryId filled in.
@@ -121,7 +213,8 @@ export async function batchFetchCategories(
   groups: ProductGroup[],
   region: string,
   onProgress: (current: number, total: number, groupId: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onGroupUpdate?: (group: ProductGroup) => void
 ): Promise<{ groups: ProductGroup[]; errors: { erpId: string; message: string }[] }> {
   if (groups.length === 0) {
     throw new Error('没有可处理的产品，请先上传数据并完成列映射');
@@ -138,6 +231,7 @@ export async function batchFetchCategories(
 
     const result = await fetchCategoryForGroup(group, region);
     updated[i] = result.group;
+    onGroupUpdate?.(result.group);
 
     if (result.error) {
       const message = result.error;
@@ -148,6 +242,44 @@ export async function batchFetchCategories(
     // Rate limiting: 1s between requests
     if (i < updated.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  onProgress(updated.length, updated.length, '');
+  return { groups: updated, errors };
+}
+
+export async function batchAnalyzeCategoriesWithAI(
+  groups: ProductGroup[],
+  region: string,
+  onProgress: (current: number, total: number, groupId: string) => void,
+  signal?: AbortSignal,
+  onGroupUpdate?: (group: ProductGroup) => void
+): Promise<{ groups: ProductGroup[]; errors: { erpId: string; message: string }[] }> {
+  if (groups.length === 0) {
+    return { groups: [], errors: [] };
+  }
+
+  const updated = [...groups];
+  const errors: { erpId: string; message: string }[] = [];
+
+  for (let i = 0; i < updated.length; i++) {
+    if (signal?.aborted) break;
+
+    const group = updated[i];
+    onProgress(i, updated.length, group.erpId);
+
+    const result = await analyzeCategoryForGroupWithAI(group, region);
+    updated[i] = result.group;
+    onGroupUpdate?.(result.group);
+
+    if (result.error) {
+      errors.push({ erpId: group.erpId, message: result.error });
+      console.error(`AI category analysis failed for ERP ID ${group.erpId}:`, result.error);
+    }
+
+    if (i < updated.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
   }
 

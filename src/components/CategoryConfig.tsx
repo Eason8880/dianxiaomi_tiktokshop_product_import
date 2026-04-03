@@ -1,9 +1,15 @@
 'use client';
 
+import type { Dispatch, SetStateAction } from 'react';
 import { useRef, useState } from 'react';
-import { ProductGroup } from '@/types';
+import { AICategoryCandidate, ProductGroup } from '@/types';
 import { CATEGORY_LOOKUP_REGION } from '@/lib/constants';
-import { batchFetchCategories, fetchCategoryForGroup } from '@/lib/tiktok-api';
+import {
+  analyzeCategoryForGroupWithAI,
+  batchAnalyzeCategoriesWithAI,
+  batchFetchCategories,
+  fetchCategoryForGroup,
+} from '@/lib/tiktok-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
@@ -12,7 +18,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CategoryConfigProps {
   groups: ProductGroup[];
-  onGroupsUpdate: (groups: ProductGroup[]) => void;
+  onGroupsUpdate: Dispatch<SetStateAction<ProductGroup[]>>;
 }
 
 function mergeGroupsByErpId(current: ProductGroup[], next: ProductGroup[]): ProductGroup[] {
@@ -24,10 +30,33 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
   const [isFetching, setIsFetching] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentProduct, setCurrentProduct] = useState('');
-  const [currentAction, setCurrentAction] = useState<'all' | 'failed' | null>(null);
+  const [currentAction, setCurrentAction] = useState<'all' | 'failed' | 'ai' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryingErpIds, setRetryingErpIds] = useState<string[]>([]);
+  const [analyzingAiErpIds, setAnalyzingAiErpIds] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+
+  async function runAIFallbackForGroups(failedGroups: ProductGroup[]) {
+    if (failedGroups.length === 0) return;
+
+    setCurrentAction('ai');
+    setProgress(0);
+
+    const result = await batchAnalyzeCategoriesWithAI(
+      failedGroups,
+      CATEGORY_LOOKUP_REGION,
+      (current, total, erpId) => {
+        setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
+        setCurrentProduct(erpId);
+      },
+      abortRef.current?.signal,
+      (updatedGroup) => {
+        onGroupsUpdate((prev) => mergeGroupsByErpId(prev, [updatedGroup]));
+      }
+    );
+
+    onGroupsUpdate((prev) => mergeGroupsByErpId(prev, result.groups));
+  }
 
   async function handleFetchAll() {
     setError(null);
@@ -45,9 +74,15 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
           setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
           setCurrentProduct(erpId);
         },
-        abortRef.current.signal
+        abortRef.current.signal,
+        (updatedGroup) => {
+          onGroupsUpdate((prev) => mergeGroupsByErpId(prev, [updatedGroup]));
+        }
       );
       onGroupsUpdate(result.groups);
+      await runAIFallbackForGroups(
+        result.groups.filter((group) => !group.recommendedCategoryId && group.categoryLookupError)
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取类目失败');
     } finally {
@@ -76,9 +111,15 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
           setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
           setCurrentProduct(erpId);
         },
-        abortRef.current.signal
+        abortRef.current.signal,
+        (updatedGroup) => {
+          onGroupsUpdate((prev) => mergeGroupsByErpId(prev, [updatedGroup]));
+        }
       );
-      onGroupsUpdate(mergeGroupsByErpId(groups, result.groups));
+      onGroupsUpdate((prev) => mergeGroupsByErpId(prev, result.groups));
+      await runAIFallbackForGroups(
+        result.groups.filter((group) => !group.recommendedCategoryId && group.categoryLookupError)
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : '重试失败项失败');
     } finally {
@@ -95,17 +136,19 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
   }
 
   function updateCategory(erpId: string, categoryId: string) {
-    const updated = groups.map((g) =>
-      g.erpId === erpId ? { ...g, recommendedCategoryId: categoryId } : g
+    onGroupsUpdate((prev) =>
+      prev.map((g) =>
+        g.erpId === erpId ? { ...g, recommendedCategoryId: categoryId } : g
+      )
     );
-    onGroupsUpdate(updated);
   }
 
   function updateLookupTitle(erpId: string, title: string) {
-    const updated = groups.map((group) =>
-      group.erpId === erpId ? { ...group, categoryLookupTitle: title } : group
+    onGroupsUpdate((prev) =>
+      prev.map((group) =>
+        group.erpId === erpId ? { ...group, categoryLookupTitle: title } : group
+      )
     );
-    onGroupsUpdate(updated);
   }
 
   async function handleRetryOne(erpId: string) {
@@ -117,20 +160,70 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
 
     try {
       const result = await fetchCategoryForGroup(group, CATEGORY_LOOKUP_REGION);
-      const updated = groups.map((item) => (item.erpId === erpId ? result.group : item));
-      onGroupsUpdate(updated);
+      const nextGroup = result.group;
+      onGroupsUpdate((prev) =>
+        prev.map((item) => (item.erpId === erpId ? nextGroup : item))
+      );
+
+      if (result.error) {
+        setAnalyzingAiErpIds((prev) => [...prev, erpId]);
+        const aiResult = await analyzeCategoryForGroupWithAI(nextGroup, CATEGORY_LOOKUP_REGION);
+        onGroupsUpdate((prev) =>
+          prev.map((item) => (item.erpId === erpId ? aiResult.group : item))
+        );
+        setAnalyzingAiErpIds((prev) => prev.filter((id) => id !== erpId));
+      }
     } finally {
       setRetryingErpIds((prev) => prev.filter((id) => id !== erpId));
     }
+  }
+
+  async function handleAnalyzeAI(erpId: string) {
+    const group = groups.find((item) => item.erpId === erpId);
+    if (!group) return;
+
+    setError(null);
+    setAnalyzingAiErpIds((prev) => [...prev, erpId]);
+
+    try {
+      const result = await analyzeCategoryForGroupWithAI(group, CATEGORY_LOOKUP_REGION);
+      onGroupsUpdate((prev) =>
+        prev.map((item) => (item.erpId === erpId ? result.group : item))
+      );
+    } finally {
+      setAnalyzingAiErpIds((prev) => prev.filter((id) => id !== erpId));
+    }
+  }
+
+  function applyAICandidate(erpId: string, candidate: AICategoryCandidate) {
+    onGroupsUpdate((prev) =>
+      prev.map((group) => {
+        if (group.erpId !== erpId) return group;
+        return {
+          ...group,
+          recommendedCategoryId: candidate.categoryId,
+          categoryName: candidate.categoryPath[candidate.categoryPath.length - 1] || candidate.categoryId,
+          categoryPath: candidate.categoryPath,
+          categoryLookupError: undefined,
+          aiCategoryCandidates: undefined,
+          aiCategoryError: undefined,
+          aiAnalyzedTitle: undefined,
+        };
+      })
+    );
   }
 
   function isRetrying(erpId: string) {
     return retryingErpIds.includes(erpId);
   }
 
+  function isAnalyzingAI(erpId: string) {
+    return analyzingAiErpIds.includes(erpId);
+  }
+
   const filledCount = groups.filter((g) => g.recommendedCategoryId).length;
   const failedCount = groups.filter((g) => !g.recommendedCategoryId && g.categoryLookupError).length;
-  const hasActiveSingleRetry = retryingErpIds.length > 0;
+  const hasActiveSingleRetry = retryingErpIds.length > 0 || analyzingAiErpIds.length > 0;
 
   return (
     <div className="space-y-6">
@@ -170,7 +263,11 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
           <Progress value={progress} className="h-2" />
           <p className="text-xs text-gray-400">
             {currentProduct
-              ? `${currentAction === 'failed' ? '正在重试失败项' : '正在处理'}：ERP ID ${currentProduct}`
+              ? `${currentAction === 'failed'
+                  ? '正在重试失败项'
+                  : currentAction === 'ai'
+                  ? '正在进行 AI 类目分析'
+                  : '正在处理'}：ERP ID ${currentProduct}`
               : '准备中…'}
           </p>
         </div>
@@ -218,7 +315,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                       <Input
                         className="h-8 text-xs"
                         placeholder={group.productTitle || group.chineseName || '输入类目查询标题…'}
-                        value={group.categoryLookupTitle || ''}
+                        value={group.categoryLookupTitle ?? group.productTitle ?? group.chineseName ?? ''}
                         onChange={(e) => updateLookupTitle(group.erpId, e.target.value)}
                         disabled={isFetching || hasActiveSingleRetry}
                       />
@@ -231,8 +328,45 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                         >
                           {isRetrying(group.erpId) ? '重试中…' : '重试'}
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAnalyzeAI(group.erpId)}
+                          disabled={isFetching || hasActiveSingleRetry}
+                        >
+                          {isAnalyzingAI(group.erpId) ? 'AI 分析中…' : 'AI 分析'}
+                        </Button>
                         <span className="text-xs text-red-500">{group.categoryLookupError}</span>
                       </div>
+                      {group.aiCategoryError ? (
+                        <p className="text-xs text-orange-500">{group.aiCategoryError}</p>
+                      ) : null}
+                      {group.aiCategoryCandidates && group.aiCategoryCandidates.length > 0 ? (
+                        <div className="space-y-2 rounded-md border border-dashed border-gray-200 bg-gray-50 p-2">
+                          <p className="text-xs font-medium text-gray-600">
+                            AI 候选类目{group.aiAnalyzedTitle ? `（分析标题：${group.aiAnalyzedTitle}）` : ''}
+                          </p>
+                          {group.aiCategoryCandidates.map((candidate) => (
+                            <div
+                              key={`${group.erpId}-${candidate.categoryId}`}
+                              className="flex items-start justify-between gap-3 rounded-md bg-white px-2 py-2"
+                            >
+                              <div className="space-y-1">
+                                <p className="text-xs text-gray-700">{candidate.categoryPath.join(' > ')}</p>
+                                <p className="text-[11px] text-gray-400">{candidate.reason}</p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => applyAICandidate(group.erpId, candidate)}
+                                disabled={isFetching || hasActiveSingleRetry}
+                              >
+                                应用
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                   {group.categoryPath && group.categoryPath.length > 0 ? (
