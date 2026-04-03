@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     const categories = data.data?.categories || data.data?.category_list || [];
+    console.log('[Category Debug] raw first item:', JSON.stringify(categories[0], null, 2));
     return NextResponse.json({ categories });
   } catch (error) {
     console.error('TikTok Category API error:', error);
