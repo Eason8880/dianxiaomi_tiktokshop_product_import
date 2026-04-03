@@ -1,0 +1,67 @@
+// Source data row from ERP export (40 columns)
+export interface SourceRow {
+  [key: string]: string | number;
+}
+
+// Target template row for Dianxiaomi TikTokShop (35 columns)
+export interface TargetRow {
+  [key: string]: string | number;
+}
+
+// Column mapping configuration
+export interface ColumnMapping {
+  targetColumn: string;
+  sourceColumn: string | null; // null = not mapped
+  transform: 'none' | 'divide1000' | 'htmlToText' | 'calculated' | 'fixedValue';
+  fixedValue?: string;
+  description?: string;
+}
+
+// Price calculation parameters
+export interface PriceParams {
+  exchangeRate: number;       // RMB per target currency (e.g., 7.2 for USD)
+  firstMileRate: number;      // RMB per kg for first-mile shipping
+  lastMileRate: number;       // RMB per kg for last-mile shipping
+  profitMultiplier: number;   // Markup multiplier
+  platformFeeRate: number;    // Platform fee percentage (0-1)
+  additionalCost: number;     // Fixed additional cost per item in RMB
+}
+
+// TikTok API credentials
+export interface TikTokApiConfig {
+  appKey: string;
+  appSecret: string;
+  accessToken: string;
+}
+
+// Product group (multiple SKU rows sharing the same ERP ID)
+export interface ProductGroup {
+  erpId: string;
+  chineseName: string;
+  productTitle: string;
+  rows: SourceRow[];
+  hasColorVariant: boolean;
+  hasSizeVariant: boolean;
+  recommendedCategoryId?: string;
+  categoryName?: string;
+}
+
+// Category recommendation result
+export interface CategoryRecommendation {
+  categoryId: string;
+  categoryName: string;
+  confidence?: number;
+}
+
+// App state
+export interface AppState {
+  step: number;
+  sourceData: SourceRow[];
+  sourceHeaders: string[];
+  columnMappings: ColumnMapping[];
+  priceParams: PriceParams;
+  tiktokConfig: TikTokApiConfig;
+  productGroups: ProductGroup[];
+  warehouseName: string;
+  defaultBrand: string;
+}

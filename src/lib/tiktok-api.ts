@@ -1,0 +1,84 @@
+import { ProductGroup, CategoryRecommendation } from '@/types';
+
+/**
+ * Fetch recommended categories for a product via the server-side API proxy.
+ */
+export async function fetchRecommendedCategory(
+  productTitle: string,
+  description?: string,
+  images?: string[]
+): Promise<CategoryRecommendation[]> {
+  const response = await fetch('/api/tiktok-category', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productTitle,
+      description,
+      images: images?.slice(0, 3),
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+
+  return (data.categories || []).map((cat: Record<string, unknown>) => ({
+    categoryId: String(cat.id || cat.category_id || ''),
+    categoryName: String(cat.local_name || cat.category_name || cat.name || ''),
+    confidence: Number(cat.confidence || 0),
+  }));
+}
+
+/**
+ * Batch fetch categories for all product groups with rate limiting.
+ * Returns updated groups with recommendedCategoryId filled in.
+ */
+export async function batchFetchCategories(
+  groups: ProductGroup[],
+  onProgress: (current: number, total: number, groupId: string) => void,
+  signal?: AbortSignal
+): Promise<ProductGroup[]> {
+  const updated = [...groups];
+
+  for (let i = 0; i < updated.length; i++) {
+    if (signal?.aborted) break;
+
+    const group = updated[i];
+    onProgress(i, updated.length, group.erpId);
+
+    try {
+      const firstRow = group.rows[0];
+      const images = [
+        String(firstRow['商品主图'] || ''),
+        String(firstRow['商品图片2'] || ''),
+      ].filter(Boolean);
+
+      const categories = await fetchRecommendedCategory(
+        group.productTitle,
+        String(firstRow['描述（不包括图片）'] || '').substring(0, 500),
+        images
+      );
+
+      if (categories.length > 0) {
+        // Pick the top-confidence result
+        const sorted = [...categories].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+        updated[i] = {
+          ...group,
+          recommendedCategoryId: sorted[0].categoryId,
+          categoryName: sorted[0].categoryName,
+        };
+      }
+    } catch (err) {
+      console.error(`Failed to fetch category for ERP ID ${group.erpId}:`, err);
+    }
+
+    // Rate limiting: 500ms between requests
+    if (i < updated.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  onProgress(updated.length, updated.length, '');
+  return updated;
+}
