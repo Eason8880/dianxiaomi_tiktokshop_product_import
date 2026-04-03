@@ -24,6 +24,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
   const [progress, setProgress] = useState(0);
   const [currentProduct, setCurrentProduct] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [batchErrors, setBatchErrors] = useState<{ erpId: string; message: string }[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [selectedRegion, setSelectedRegion] = useState('');
   const abortRef = useRef<AbortController | null>(null);
@@ -46,13 +47,14 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
       return;
     }
     setError(null);
+    setBatchErrors([]);
     setIsFetching(true);
     setProgress(0);
 
     abortRef.current = new AbortController();
 
     try {
-      const updated = await batchFetchCategories(
+      const result = await batchFetchCategories(
         groups,
         selectedRegion,
         (current, total, erpId) => {
@@ -61,7 +63,10 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         },
         abortRef.current.signal
       );
-      onGroupsUpdate(updated);
+      onGroupsUpdate(result.groups);
+      if (result.errors.length > 0) {
+        setBatchErrors(result.errors);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取类目失败');
     } finally {
@@ -146,6 +151,19 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {batchErrors.length > 0 && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            <p className="font-medium mb-1">{batchErrors.length} 个产品获取失败：</p>
+            <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto">
+              {batchErrors.map((e) => (
+                <li key={e.erpId}>ERP {e.erpId}：{e.message}</li>
+              ))}
+            </ul>
+          </AlertDescription>
         </Alert>
       )}
 

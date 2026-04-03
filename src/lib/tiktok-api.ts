@@ -41,8 +41,13 @@ export async function batchFetchCategories(
   region: string,
   onProgress: (current: number, total: number, groupId: string) => void,
   signal?: AbortSignal
-): Promise<ProductGroup[]> {
+): Promise<{ groups: ProductGroup[]; errors: { erpId: string; message: string }[] }> {
+  if (groups.length === 0) {
+    throw new Error('没有可处理的产品，请先上传数据并完成列映射');
+  }
+
   const updated = [...groups];
+  const errors: { erpId: string; message: string }[] = [];
 
   for (let i = 0; i < updated.length; i++) {
     if (signal?.aborted) break;
@@ -73,6 +78,8 @@ export async function batchFetchCategories(
         };
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : '未知错误';
+      errors.push({ erpId: group.erpId, message });
       console.error(`Failed to fetch category for ERP ID ${group.erpId}:`, err);
     }
 
@@ -83,5 +90,5 @@ export async function batchFetchCategories(
   }
 
   onProgress(updated.length, updated.length, '');
-  return updated;
+  return { groups: updated, errors };
 }
