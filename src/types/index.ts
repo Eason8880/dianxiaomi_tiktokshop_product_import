@@ -35,6 +35,9 @@ export interface ProductGroup {
   rows: SourceRow[];
   hasColorVariant: boolean;
   hasSizeVariant: boolean;
+  categoryLookupTitle?: string;
+  categoryLookupError?: string;
+  categoryMatchedTitle?: string;
   recommendedCategoryId?: string;
   categoryName?: string;
   categoryPath?: string[]; // full hierarchy path from root to leaf

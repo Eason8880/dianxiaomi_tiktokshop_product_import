@@ -1,5 +1,7 @@
 import { ColumnMapping, PriceParams } from '@/types';
 
+export const CATEGORY_LOOKUP_REGION = 'PH';
+
 // Source column headers (from ERP export, 40 columns)
 export const SOURCE_COLUMNS = [
   'ERP类目',           // 0

@@ -1,5 +1,16 @@
 import { ProductGroup, CategoryRecommendation } from '@/types';
 
+export interface CategoryFetchResponse {
+  categories: CategoryRecommendation[];
+  matchedTitle?: string;
+  attemptedTitles?: string[];
+}
+
+export interface CategoryLookupResult {
+  group: ProductGroup;
+  error?: string;
+}
+
 /**
  * Fetch recommended categories for a product via the server-side API proxy.
  */
@@ -8,7 +19,7 @@ export async function fetchRecommendedCategory(
   region: string,
   description?: string,
   images?: string[]
-): Promise<CategoryRecommendation[]> {
+): Promise<CategoryFetchResponse> {
   const response = await fetch('/api/tiktok-category', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,13 +35,82 @@ export async function fetchRecommendedCategory(
     throw new Error(data.error || `HTTP ${response.status}`);
   }
 
-  return (data.categories || []).map((cat: Record<string, unknown>) => ({
-    categoryId: String(cat.id || cat.category_id || ''),
-    categoryName: String(cat.local_name || cat.name || cat.category_name || ''),
-    confidence: Number(cat.confidence || 0),
-    isLeaf: Boolean(cat.is_leaf),
-    categoryPath: Array.isArray(cat.categoryPath) ? (cat.categoryPath as string[]) : undefined,
-  }));
+  return {
+    categories: (data.categories || []).map((cat: Record<string, unknown>) => ({
+      categoryId: String(cat.id || cat.category_id || ''),
+      categoryName: String(cat.local_name || cat.name || cat.category_name || ''),
+      confidence: Number(cat.confidence || 0),
+      isLeaf: Boolean(cat.is_leaf),
+      categoryPath: Array.isArray(cat.categoryPath) ? (cat.categoryPath as string[]) : undefined,
+    })),
+    matchedTitle: typeof data.matchedTitle === 'string' ? data.matchedTitle : undefined,
+    attemptedTitles: Array.isArray(data.attemptedTitles)
+      ? data.attemptedTitles.filter((title: unknown): title is string => typeof title === 'string')
+      : undefined,
+  };
+}
+
+function pickBestCategory(categories: CategoryRecommendation[]): CategoryRecommendation | undefined {
+  const sorted = [...categories].sort((a, b) => {
+    const aLeaf = a.isLeaf ? 1 : 0;
+    const bLeaf = b.isLeaf ? 1 : 0;
+    if (bLeaf !== aLeaf) return bLeaf - aLeaf;
+    return (b.confidence || 0) - (a.confidence || 0);
+  });
+
+  return sorted[0];
+}
+
+export async function fetchCategoryForGroup(
+  group: ProductGroup,
+  region: string
+): Promise<CategoryLookupResult> {
+  const firstRow = group.rows[0];
+  const images = [
+    String(firstRow['商品主图'] || ''),
+    String(firstRow['商品图片2'] || ''),
+  ].filter(Boolean);
+  const lookupTitle = group.categoryLookupTitle || group.productTitle;
+
+  try {
+    const result = await fetchRecommendedCategory(
+      lookupTitle,
+      region,
+      undefined,
+      images
+    );
+    const bestCategory = pickBestCategory(result.categories);
+
+    if (!bestCategory) {
+      return {
+        group: {
+          ...group,
+          categoryLookupError: '未返回可用类目',
+        },
+        error: '未返回可用类目',
+      };
+    }
+
+    return {
+      group: {
+        ...group,
+        recommendedCategoryId: bestCategory.categoryId,
+        categoryName: bestCategory.categoryName,
+        categoryPath: bestCategory.categoryPath,
+        categoryLookupError: undefined,
+        categoryMatchedTitle: result.matchedTitle,
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '未知错误';
+    return {
+      group: {
+        ...group,
+        categoryLookupError: message,
+      },
+      error: message,
+    };
+  }
 }
 
 /**
@@ -56,39 +136,13 @@ export async function batchFetchCategories(
     const group = updated[i];
     onProgress(i, updated.length, group.erpId);
 
-    try {
-      const firstRow = group.rows[0];
-      const images = [
-        String(firstRow['商品主图'] || ''),
-        String(firstRow['商品图片2'] || ''),
-      ].filter(Boolean);
+    const result = await fetchCategoryForGroup(group, region);
+    updated[i] = result.group;
 
-      const categories = await fetchRecommendedCategory(
-        group.productTitle,
-        region,
-        undefined,
-        images
-      );
-
-      if (categories.length > 0) {
-        // Prefer leaf categories (most specific), then by confidence
-        const sorted = [...categories].sort((a, b) => {
-          const aLeaf = a.isLeaf ? 1 : 0;
-          const bLeaf = b.isLeaf ? 1 : 0;
-          if (bLeaf !== aLeaf) return bLeaf - aLeaf;
-          return (b.confidence || 0) - (a.confidence || 0);
-        });
-        updated[i] = {
-          ...group,
-          recommendedCategoryId: sorted[0].categoryId,
-          categoryName: sorted[0].categoryName,
-          categoryPath: sorted[0].categoryPath,
-        };
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '未知错误';
+    if (result.error) {
+      const message = result.error;
       errors.push({ erpId: group.erpId, message });
-      console.error(`Failed to fetch category for ERP ID ${group.erpId}:`, err);
+      console.error(`Failed to fetch category for ERP ID ${group.erpId}:`, message);
     }
 
     // Rate limiting: 1s between requests

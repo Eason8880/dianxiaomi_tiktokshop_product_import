@@ -1,64 +1,46 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { ProductGroup } from '@/types';
-import { batchFetchCategories } from '@/lib/tiktok-api';
+import { CATEGORY_LOOKUP_REGION } from '@/lib/constants';
+import { batchFetchCategories, fetchCategoryForGroup } from '@/lib/tiktok-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-interface Region {
-  code: string;
-  name: string;
-}
-
 interface CategoryConfigProps {
   groups: ProductGroup[];
   onGroupsUpdate: (groups: ProductGroup[]) => void;
+}
+
+function mergeGroupsByErpId(current: ProductGroup[], next: ProductGroup[]): ProductGroup[] {
+  const nextMap = new Map(next.map((group) => [group.erpId, group]));
+  return current.map((group) => nextMap.get(group.erpId) || group);
 }
 
 export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) {
   const [isFetching, setIsFetching] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentProduct, setCurrentProduct] = useState('');
+  const [currentAction, setCurrentAction] = useState<'all' | 'failed' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [batchErrors, setBatchErrors] = useState<{ erpId: string; message: string }[]>([]);
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [selectedRegion, setSelectedRegion] = useState('');
+  const [retryingErpIds, setRetryingErpIds] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    fetch('/api/tiktok-shops')
-      .then((r) => r.json())
-      .then((data) => {
-        setRegions(data.regions || []);
-        if (data.regions?.length > 0) {
-          const preferredRegion =
-            data.regions.find((region: Region) => region.code === 'PH') || data.regions[0];
-          setSelectedRegion(preferredRegion.code);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   async function handleFetchAll() {
-    if (!selectedRegion) {
-      setError('请选择目标国家/地区');
-      return;
-    }
     setError(null);
-    setBatchErrors([]);
     setIsFetching(true);
     setProgress(0);
+    setCurrentAction('all');
 
     abortRef.current = new AbortController();
 
     try {
       const result = await batchFetchCategories(
         groups,
-        selectedRegion,
+        CATEGORY_LOOKUP_REGION,
         (current, total, erpId) => {
           setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
           setCurrentProduct(erpId);
@@ -66,20 +48,50 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         abortRef.current.signal
       );
       onGroupsUpdate(result.groups);
-      if (result.errors.length > 0) {
-        setBatchErrors(result.errors);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取类目失败');
     } finally {
       setIsFetching(false);
       setCurrentProduct('');
+      setCurrentAction(null);
+    }
+  }
+
+  async function handleRetryFailed() {
+    const failedGroups = groups.filter((group) => !group.recommendedCategoryId && group.categoryLookupError);
+    if (failedGroups.length === 0) return;
+
+    setError(null);
+    setIsFetching(true);
+    setProgress(0);
+    setCurrentAction('failed');
+
+    abortRef.current = new AbortController();
+
+    try {
+      const result = await batchFetchCategories(
+        failedGroups,
+        CATEGORY_LOOKUP_REGION,
+        (current, total, erpId) => {
+          setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
+          setCurrentProduct(erpId);
+        },
+        abortRef.current.signal
+      );
+      onGroupsUpdate(mergeGroupsByErpId(groups, result.groups));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '重试失败项失败');
+    } finally {
+      setIsFetching(false);
+      setCurrentProduct('');
+      setCurrentAction(null);
     }
   }
 
   function handleStop() {
     abortRef.current?.abort();
     setIsFetching(false);
+    setCurrentAction(null);
   }
 
   function updateCategory(erpId: string, categoryId: string) {
@@ -89,39 +101,44 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
     onGroupsUpdate(updated);
   }
 
+  function updateLookupTitle(erpId: string, title: string) {
+    const updated = groups.map((group) =>
+      group.erpId === erpId ? { ...group, categoryLookupTitle: title } : group
+    );
+    onGroupsUpdate(updated);
+  }
+
+  async function handleRetryOne(erpId: string) {
+    const group = groups.find((item) => item.erpId === erpId);
+    if (!group) return;
+
+    setError(null);
+    setRetryingErpIds((prev) => [...prev, erpId]);
+
+    try {
+      const result = await fetchCategoryForGroup(group, CATEGORY_LOOKUP_REGION);
+      const updated = groups.map((item) => (item.erpId === erpId ? result.group : item));
+      onGroupsUpdate(updated);
+    } finally {
+      setRetryingErpIds((prev) => prev.filter((id) => id !== erpId));
+    }
+  }
+
+  function isRetrying(erpId: string) {
+    return retryingErpIds.includes(erpId);
+  }
+
   const filledCount = groups.filter((g) => g.recommendedCategoryId).length;
+  const failedCount = groups.filter((g) => !g.recommendedCategoryId && g.categoryLookupError).length;
+  const hasActiveSingleRetry = retryingErpIds.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* Region selector + batch fetch */}
+      {/* Batch fetch */}
       <div className="flex items-center gap-3 flex-wrap">
-        {regions.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 whitespace-nowrap">目标国家</span>
-            <div className="flex gap-1.5">
-              {regions.map((r) => (
-                <button
-                  key={r.code}
-                  onClick={() => setSelectedRegion(r.code)}
-                  disabled={isFetching}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors border ${
-                    selectedRegion === r.code
-                      ? 'bg-black text-white border-black'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-                  }`}
-                >
-                  {r.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">未配置店铺信息</span>
-        )}
-
         <Button
           onClick={handleFetchAll}
-          disabled={isFetching || !selectedRegion}
+          disabled={isFetching || hasActiveSingleRetry}
           className="gap-2"
         >
           {isFetching ? (
@@ -130,8 +147,15 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
               获取中…
             </>
           ) : (
-            '批量获取推荐类目'
+            '批量获取推荐类目（PH）'
           )}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleRetryFailed}
+          disabled={isFetching || hasActiveSingleRetry || failedCount === 0}
+        >
+          重试失败项{failedCount > 0 ? `（${failedCount}）` : ''}
         </Button>
         {isFetching && (
           <Button variant="outline" size="sm" onClick={handleStop}>停止</Button>
@@ -145,7 +169,9 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         <div className="space-y-2">
           <Progress value={progress} className="h-2" />
           <p className="text-xs text-gray-400">
-            {currentProduct ? `正在处理：ERP ID ${currentProduct}` : '准备中…'}
+            {currentProduct
+              ? `${currentAction === 'failed' ? '正在重试失败项' : '正在处理'}：ERP ID ${currentProduct}`
+              : '准备中…'}
           </p>
         </div>
       )}
@@ -156,15 +182,10 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         </Alert>
       )}
 
-      {batchErrors.length > 0 && (
-        <Alert variant="destructive">
+      {failedCount > 0 && !isFetching && (
+        <Alert>
           <AlertDescription>
-            <p className="font-medium mb-1">{batchErrors.length} 个产品获取失败：</p>
-            <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto">
-              {batchErrors.map((e) => (
-                <li key={e.erpId}>ERP {e.erpId}：{e.message}</li>
-              ))}
-            </ul>
+            {failedCount} 个商品未获取成功，可修改“类目查询标题”后单独重试，或点击上方按钮批量重试失败项。
           </AlertDescription>
         </Alert>
       )}
@@ -189,6 +210,31 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                   <p className="text-gray-800 text-xs truncate max-w-[320px]" title={group.productTitle}>
                     {group.productTitle || group.chineseName}
                   </p>
+                  {!group.recommendedCategoryId && group.categoryLookupError ? (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-[11px] text-gray-400">
+                        原始标题仅用于导出，不会被下面的查询标题覆盖。
+                      </p>
+                      <Input
+                        className="h-8 text-xs"
+                        placeholder={group.productTitle || group.chineseName || '输入类目查询标题…'}
+                        value={group.categoryLookupTitle || ''}
+                        onChange={(e) => updateLookupTitle(group.erpId, e.target.value)}
+                        disabled={isFetching || hasActiveSingleRetry}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRetryOne(group.erpId)}
+                          disabled={isFetching || hasActiveSingleRetry}
+                        >
+                          {isRetrying(group.erpId) ? '重试中…' : '重试'}
+                        </Button>
+                        <span className="text-xs text-red-500">{group.categoryLookupError}</span>
+                      </div>
+                    </div>
+                  ) : null}
                   {group.categoryPath && group.categoryPath.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-0.5 mt-0.5">
                       {group.categoryPath.map((seg, idx) => (
@@ -209,11 +255,14 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                     placeholder="输入分类 ID…"
                     value={group.recommendedCategoryId || ''}
                     onChange={(e) => updateCategory(group.erpId, e.target.value)}
+                    disabled={isFetching || hasActiveSingleRetry}
                   />
                 </td>
                 <td className="px-4 py-2">
                   {group.recommendedCategoryId ? (
                     <Badge className="bg-green-100 text-green-700 hover:bg-green-100">已填写</Badge>
+                  ) : group.categoryLookupError ? (
+                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">获取失败</Badge>
                   ) : (
                     <Badge variant="outline" className="text-gray-400">待填写</Badge>
                   )}
