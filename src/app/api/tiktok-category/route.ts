@@ -109,9 +109,7 @@ export async function POST(request: NextRequest) {
     if (description) {
       requestBody.description = description;
     }
-    if (images && images.length > 0) {
-      requestBody.images = images.map((url) => ({ uri: url }));
-    }
+    // images 需要先通过 Upload Product Image API 上传后才能传 URI，暂不传图片
 
     const bodyString = JSON.stringify(requestBody);
 

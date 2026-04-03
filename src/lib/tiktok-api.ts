@@ -16,7 +16,6 @@ export async function fetchRecommendedCategory(
       productTitle,
       region,
       description,
-      images: images?.slice(0, 3),
     }),
   });
 
