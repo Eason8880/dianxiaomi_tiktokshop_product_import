@@ -20,7 +20,7 @@ function generateSignature(
   appSecret: string
 ): string {
   const sortedKeys = Object.keys(queryParams)
-    .filter((k) => k !== 'sign')
+    .filter((k) => k !== 'sign' && k !== 'access_token')
     .sort();
 
   let baseString = path;
@@ -31,10 +31,16 @@ function generateSignature(
 
   const signString = appSecret + baseString + appSecret;
 
-  return crypto
+  const result = crypto
     .createHmac('sha256', appSecret)
     .update(signString)
     .digest('hex');
+
+  console.log('[Sign Debug] sortedKeys:', sortedKeys);
+  console.log('[Sign Debug] baseString (no secret):', baseString);
+  console.log('[Sign Debug] sign:', result);
+
+  return result;
 }
 
 export async function POST(request: NextRequest) {
