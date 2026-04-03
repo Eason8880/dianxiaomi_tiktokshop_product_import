@@ -36,6 +36,7 @@ export async function fetchRecommendedCategory(
     categoryId: String(cat.id || cat.category_id || ''),
     categoryName: String(cat.local_name || cat.name || cat.category_name || ''),
     confidence: Number(cat.confidence || 0),
+    isLeaf: Boolean(cat.is_leaf),
     categoryPath: Array.isArray(cat.categoryPath) ? (cat.categoryPath as string[]) : undefined,
   }));
 }
@@ -81,7 +82,13 @@ export async function batchFetchCategories(
       );
 
       if (categories.length > 0) {
-        const sorted = [...categories].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+        // Prefer leaf categories (most specific), then by confidence
+        const sorted = [...categories].sort((a, b) => {
+          const aLeaf = a.isLeaf ? 1 : 0;
+          const bLeaf = b.isLeaf ? 1 : 0;
+          if (bLeaf !== aLeaf) return bLeaf - aLeaf;
+          return (b.confidence || 0) - (a.confidence || 0);
+        });
         updated[i] = {
           ...group,
           recommendedCategoryId: sorted[0].categoryId,

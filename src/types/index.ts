@@ -45,6 +45,7 @@ export interface CategoryRecommendation {
   categoryId: string;
   categoryName: string;
   confidence?: number;
+  isLeaf?: boolean;
   categoryPath?: string[]; // full path from root to leaf, e.g. ["Fashion", "Accessories", "Rings"]
 }
 
