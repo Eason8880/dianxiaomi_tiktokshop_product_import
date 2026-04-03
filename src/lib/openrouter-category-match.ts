@@ -1,4 +1,5 @@
 import { generateCategoryTitleVariants } from '@/lib/category-title-variants';
+import { callOpenRouterChat, parseOpenRouterJson } from '@/lib/openrouter';
 import { TikTokLeafCategory } from '@/lib/tiktok-category-tree';
 import { AICategoryCandidate } from '@/types';
 
@@ -11,9 +12,6 @@ interface OpenRouterMatch {
 interface OpenRouterResponse {
   matches?: OpenRouterMatch[];
 }
-
-const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-const OPENROUTER_DEFAULT_MODEL = 'openai/gpt-4.1-mini';
 
 const TITLE_STOPWORDS = new Set([
   'a',
@@ -122,76 +120,42 @@ function sanitizeMatches(
       categoryId,
       categoryPath: leaf.categoryPath,
       reason: String(match.reason || 'AI 推荐的候选类目'),
-      score: typeof match.score === 'number' ? match.score : undefined,
+      score:
+        typeof match.score === 'number' &&
+        Number.isFinite(match.score) &&
+        match.score >= 0 &&
+        match.score <= 1
+          ? match.score
+          : undefined,
     });
   }
 
   return candidates.slice(0, 3);
 }
 
-function tryParseJson(content: string): OpenRouterResponse {
-  try {
-    return JSON.parse(content) as OpenRouterResponse;
-  } catch {
-    const start = content.indexOf('{');
-    const end = content.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      return JSON.parse(content.slice(start, end + 1)) as OpenRouterResponse;
-    }
-    throw new Error('AI 返回结果不是有效 JSON');
-  }
-}
-
 export async function analyzeCategoryWithOpenRouter(
   title: string,
   leafCategories: TikTokLeafCategory[]
 ): Promise<{ candidates: AICategoryCandidate[]; analyzedTitle: string; model: string }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error('未配置 OPENROUTER_API_KEY');
-  }
-
-  const model = process.env.OPENROUTER_MODEL || OPENROUTER_DEFAULT_MODEL;
-  const baseUrl = process.env.OPENROUTER_BASE_URL || OPENROUTER_DEFAULT_BASE_URL;
-
   const shortlisted = shortlistLeafCategories(title, leafCategories);
   const leafMap = new Map(shortlisted.map((leaf) => [leaf.categoryId, leaf]));
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a product category classifier. Choose only from the provided candidate TikTok Shop PH leaf categories and return strict JSON.',
-        },
-        {
-          role: 'user',
-          content: buildPrompt(title, shortlisted),
-        },
-      ],
-    }),
+  const { content, model } = await callOpenRouterChat({
+    temperature: 0.1,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a product category classifier. Choose only from the provided candidate TikTok Shop PH leaf categories and return strict JSON.',
+      },
+      {
+        role: 'user',
+        content: buildPrompt(title, shortlisted),
+      },
+    ],
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error?.message || data.message || 'OpenRouter 调用失败');
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('AI 未返回可解析内容');
-  }
-
-  const parsed = tryParseJson(content);
+  const parsed = parseOpenRouterJson<OpenRouterResponse>(content);
   const candidates = sanitizeMatches(parsed, leafMap);
   if (candidates.length === 0) {
     throw new Error('AI 未返回有效候选类目');
@@ -200,6 +164,6 @@ export async function analyzeCategoryWithOpenRouter(
   return {
     candidates,
     analyzedTitle: title,
-    model: String(data.model || model),
+    model,
   };
 }

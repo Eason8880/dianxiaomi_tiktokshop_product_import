@@ -42,6 +42,7 @@ export interface ProductGroup {
   aiCategoryError?: string;
   aiAnalyzedTitle?: string;
   recommendedCategoryId?: string;
+  categorySource?: 'tiktok' | 'ai';
   categoryName?: string;
   categoryPath?: string[]; // full hierarchy path from root to leaf
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { translateCategoryPaths } from '@/lib/category-translation';
 import { getAccessToken } from '@/lib/tiktok-token';
 import { generateCategoryTitleVariants } from '@/lib/category-title-variants';
 import {
@@ -165,12 +166,27 @@ export async function POST(request: NextRequest) {
     // Fetch full category tree to resolve hierarchy paths
     const pathMap = await fetchCategoryPathMap(appKey, appSecret, shopCipher, accessToken);
 
-    const categories = rawCategories.map((cat) => {
+    const categoriesWithEnglishPath = rawCategories.map((cat) => {
       const id = String(cat.id || '');
       const path = pathMap.get(id) || [];
       return {
         ...cat,
         categoryPath: path,
+      };
+    });
+
+    const translatedPathMap = await translateCategoryPaths(
+      categoriesWithEnglishPath.map((category) => category.categoryPath)
+    );
+
+    const categories = categoriesWithEnglishPath.map((category) => {
+      const englishPath = category.categoryPath;
+      const translatedPath = translatedPathMap.get(englishPath.join(' > ')) || englishPath;
+
+      return {
+        ...category,
+        local_name: translatedPath[translatedPath.length - 1] || category.local_name || category.name,
+        categoryPath: translatedPath,
       };
     });
 

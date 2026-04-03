@@ -8,7 +8,6 @@ import {
   analyzeCategoryForGroupWithAI,
   batchAnalyzeCategoriesWithAI,
   batchFetchCategories,
-  fetchCategoryForGroup,
 } from '@/lib/tiktok-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,9 +29,8 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
   const [isFetching, setIsFetching] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentProduct, setCurrentProduct] = useState('');
-  const [currentAction, setCurrentAction] = useState<'all' | 'failed' | 'ai' | null>(null);
+  const [currentAction, setCurrentAction] = useState<'all' | 'ai' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [retryingErpIds, setRetryingErpIds] = useState<string[]>([]);
   const [analyzingAiErpIds, setAnalyzingAiErpIds] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -92,43 +90,6 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
     }
   }
 
-  async function handleRetryFailed() {
-    const failedGroups = groups.filter((group) => !group.recommendedCategoryId && group.categoryLookupError);
-    if (failedGroups.length === 0) return;
-
-    setError(null);
-    setIsFetching(true);
-    setProgress(0);
-    setCurrentAction('failed');
-
-    abortRef.current = new AbortController();
-
-    try {
-      const result = await batchFetchCategories(
-        failedGroups,
-        CATEGORY_LOOKUP_REGION,
-        (current, total, erpId) => {
-          setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
-          setCurrentProduct(erpId);
-        },
-        abortRef.current.signal,
-        (updatedGroup) => {
-          onGroupsUpdate((prev) => mergeGroupsByErpId(prev, [updatedGroup]));
-        }
-      );
-      onGroupsUpdate((prev) => mergeGroupsByErpId(prev, result.groups));
-      await runAIFallbackForGroups(
-        result.groups.filter((group) => !group.recommendedCategoryId && group.categoryLookupError)
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '重试失败项失败');
-    } finally {
-      setIsFetching(false);
-      setCurrentProduct('');
-      setCurrentAction(null);
-    }
-  }
-
   function handleStop() {
     abortRef.current?.abort();
     setIsFetching(false);
@@ -138,44 +99,19 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
   function updateCategory(erpId: string, categoryId: string) {
     onGroupsUpdate((prev) =>
       prev.map((g) =>
-        g.erpId === erpId ? { ...g, recommendedCategoryId: categoryId } : g
+        g.erpId !== erpId
+          ? g
+          : categoryId === g.recommendedCategoryId
+            ? { ...g, recommendedCategoryId: categoryId }
+            : {
+                ...g,
+                recommendedCategoryId: categoryId,
+                categorySource: undefined,
+                categoryName: undefined,
+                categoryPath: undefined,
+              }
       )
     );
-  }
-
-  function updateLookupTitle(erpId: string, title: string) {
-    onGroupsUpdate((prev) =>
-      prev.map((group) =>
-        group.erpId === erpId ? { ...group, categoryLookupTitle: title } : group
-      )
-    );
-  }
-
-  async function handleRetryOne(erpId: string) {
-    const group = groups.find((item) => item.erpId === erpId);
-    if (!group) return;
-
-    setError(null);
-    setRetryingErpIds((prev) => [...prev, erpId]);
-
-    try {
-      const result = await fetchCategoryForGroup(group, CATEGORY_LOOKUP_REGION);
-      const nextGroup = result.group;
-      onGroupsUpdate((prev) =>
-        prev.map((item) => (item.erpId === erpId ? nextGroup : item))
-      );
-
-      if (result.error) {
-        setAnalyzingAiErpIds((prev) => [...prev, erpId]);
-        const aiResult = await analyzeCategoryForGroupWithAI(nextGroup, CATEGORY_LOOKUP_REGION);
-        onGroupsUpdate((prev) =>
-          prev.map((item) => (item.erpId === erpId ? aiResult.group : item))
-        );
-        setAnalyzingAiErpIds((prev) => prev.filter((id) => id !== erpId));
-      }
-    } finally {
-      setRetryingErpIds((prev) => prev.filter((id) => id !== erpId));
-    }
   }
 
   async function handleAnalyzeAI(erpId: string) {
@@ -202,6 +138,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         return {
           ...group,
           recommendedCategoryId: candidate.categoryId,
+          categorySource: 'ai',
           categoryName: candidate.categoryPath[candidate.categoryPath.length - 1] || candidate.categoryId,
           categoryPath: candidate.categoryPath,
           categoryLookupError: undefined,
@@ -213,17 +150,33 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
     );
   }
 
-  function isRetrying(erpId: string) {
-    return retryingErpIds.includes(erpId);
-  }
-
   function isAnalyzingAI(erpId: string) {
     return analyzingAiErpIds.includes(erpId);
   }
 
+  function renderCategorySource(group: ProductGroup) {
+    if (group.categorySource === 'tiktok') {
+      return <Badge variant="outline" className="text-blue-600 border-blue-200">TikTok 推荐</Badge>;
+    }
+
+    if (group.categorySource === 'ai') {
+      return <Badge variant="outline" className="text-amber-700 border-amber-200">AI 分析</Badge>;
+    }
+
+    return <span className="text-xs text-gray-400">—</span>;
+  }
+
   const filledCount = groups.filter((g) => g.recommendedCategoryId).length;
-  const failedCount = groups.filter((g) => !g.recommendedCategoryId && g.categoryLookupError).length;
-  const hasActiveSingleRetry = retryingErpIds.length > 0 || analyzingAiErpIds.length > 0;
+  const unresolvedCount = groups.filter(
+    (group) =>
+      !group.recommendedCategoryId &&
+      !group.aiCategoryCandidates?.length &&
+      (group.categoryLookupError || group.aiCategoryError)
+  ).length;
+  const candidatePendingCount = groups.filter(
+    (group) => !group.recommendedCategoryId && Boolean(group.aiCategoryCandidates?.length)
+  ).length;
+  const hasActiveSingleRetry = analyzingAiErpIds.length > 0;
 
   return (
     <div className="space-y-6">
@@ -243,13 +196,6 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
             '批量获取推荐类目（PH）'
           )}
         </Button>
-        <Button
-          variant="outline"
-          onClick={handleRetryFailed}
-          disabled={isFetching || hasActiveSingleRetry || failedCount === 0}
-        >
-          重试失败项{failedCount > 0 ? `（${failedCount}）` : ''}
-        </Button>
         {isFetching && (
           <Button variant="outline" size="sm" onClick={handleStop}>停止</Button>
         )}
@@ -263,9 +209,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
           <Progress value={progress} className="h-2" />
           <p className="text-xs text-gray-400">
             {currentProduct
-              ? `${currentAction === 'failed'
-                  ? '正在重试失败项'
-                  : currentAction === 'ai'
+              ? `${currentAction === 'ai'
                   ? '正在进行 AI 类目分析'
                   : '正在处理'}：ERP ID ${currentProduct}`
               : '准备中…'}
@@ -279,10 +223,13 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         </Alert>
       )}
 
-      {failedCount > 0 && !isFetching && (
+      {(unresolvedCount > 0 || candidatePendingCount > 0) && !isFetching && (
         <Alert>
           <AlertDescription>
-            {failedCount} 个商品未获取成功，可修改“类目查询标题”后单独重试，或点击上方按钮批量重试失败项。
+            处理逻辑为：先调用 TikTok API 推荐类目，失败后自动切换到 AI 类目分析。
+            已有类目但不满意时，也可以点击单个商品的 AI 分析重新选择。
+            {candidatePendingCount > 0 ? ` 当前有 ${candidatePendingCount} 个商品已有 AI 候选类目待确认。` : ''}
+            {unresolvedCount > 0 ? ` 仍有 ${unresolvedCount} 个商品需要人工处理或再次触发 AI 分析。` : ''}
           </AlertDescription>
         </Alert>
       )}
@@ -292,84 +239,26 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
-              <th className="px-4 py-3 text-left font-medium text-gray-600 w-24">ERP ID</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 w-44">ERP ID / 中文名</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">产品名称</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 w-24">变体数</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 w-48">分类 ID（必填）</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 w-28">类目来源</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 w-24">状态</th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group) => (
               <tr key={group.erpId} className="border-b last:border-0 hover:bg-gray-50">
-                <td className="px-4 py-2 text-gray-500 font-mono text-xs">{group.erpId}</td>
+                <td className="px-4 py-2">
+                  <p className="text-gray-600 font-mono text-xs">{group.erpId}</p>
+                  <p className="text-gray-800 text-xs mt-1">{group.chineseName || '未提供中文名'}</p>
+                </td>
                 <td className="px-4 py-2">
                   <p className="text-gray-800 text-xs truncate max-w-[320px]" title={group.productTitle}>
-                    {group.productTitle || group.chineseName}
+                    {group.productTitle || group.chineseName || '未提供产品标题'}
                   </p>
-                  {!group.recommendedCategoryId && group.categoryLookupError ? (
-                    <div className="mt-2 space-y-2">
-                      <p className="text-[11px] text-gray-400">
-                        原始标题仅用于导出，不会被下面的查询标题覆盖。
-                      </p>
-                      <Input
-                        className="h-8 text-xs"
-                        placeholder={group.productTitle || group.chineseName || '输入类目查询标题…'}
-                        value={group.categoryLookupTitle ?? group.productTitle ?? group.chineseName ?? ''}
-                        onChange={(e) => updateLookupTitle(group.erpId, e.target.value)}
-                        disabled={isFetching || hasActiveSingleRetry}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRetryOne(group.erpId)}
-                          disabled={isFetching || hasActiveSingleRetry}
-                        >
-                          {isRetrying(group.erpId) ? '重试中…' : '重试'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAnalyzeAI(group.erpId)}
-                          disabled={isFetching || hasActiveSingleRetry}
-                        >
-                          {isAnalyzingAI(group.erpId) ? 'AI 分析中…' : 'AI 分析'}
-                        </Button>
-                        <span className="text-xs text-red-500">{group.categoryLookupError}</span>
-                      </div>
-                      {group.aiCategoryError ? (
-                        <p className="text-xs text-orange-500">{group.aiCategoryError}</p>
-                      ) : null}
-                      {group.aiCategoryCandidates && group.aiCategoryCandidates.length > 0 ? (
-                        <div className="space-y-2 rounded-md border border-dashed border-gray-200 bg-gray-50 p-2">
-                          <p className="text-xs font-medium text-gray-600">
-                            AI 候选类目{group.aiAnalyzedTitle ? `（分析标题：${group.aiAnalyzedTitle}）` : ''}
-                          </p>
-                          {group.aiCategoryCandidates.map((candidate) => (
-                            <div
-                              key={`${group.erpId}-${candidate.categoryId}`}
-                              className="flex items-start justify-between gap-3 rounded-md bg-white px-2 py-2"
-                            >
-                              <div className="space-y-1">
-                                <p className="text-xs text-gray-700">{candidate.categoryPath.join(' > ')}</p>
-                                <p className="text-[11px] text-gray-400">{candidate.reason}</p>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => applyAICandidate(group.erpId, candidate)}
-                                disabled={isFetching || hasActiveSingleRetry}
-                              >
-                                应用
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {group.categoryPath && group.categoryPath.length > 0 ? (
+                  {group.recommendedCategoryId && group.categoryPath && group.categoryPath.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-0.5 mt-0.5">
                       {group.categoryPath.map((seg, idx) => (
                         <span key={idx} className="flex items-center gap-0.5">
@@ -378,9 +267,61 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                         </span>
                       ))}
                     </div>
-                  ) : group.categoryName ? (
+                  ) : group.recommendedCategoryId && group.categoryName ? (
                     <p className="text-gray-400 text-xs mt-0.5">{group.categoryName}</p>
                   ) : null}
+                  <div className="mt-2 space-y-2">
+                    {(group.categoryLookupError || group.aiCategoryError) ? (
+                      <div className="space-y-1">
+                        {group.categoryLookupError ? (
+                          <p className="text-xs text-red-500">{group.categoryLookupError}</p>
+                        ) : null}
+                        {group.aiCategoryError ? (
+                          <p className="text-xs text-orange-500">{group.aiCategoryError}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {!group.aiCategoryCandidates?.length ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAnalyzeAI(group.erpId)}
+                        disabled={isFetching || hasActiveSingleRetry}
+                      >
+                        {isAnalyzingAI(group.erpId)
+                          ? 'AI 分析中…'
+                          : group.recommendedCategoryId
+                            ? 'AI 重新分析'
+                            : 'AI 分析'}
+                      </Button>
+                    ) : null}
+                    {group.aiCategoryCandidates && group.aiCategoryCandidates.length > 0 ? (
+                      <div className="space-y-2 rounded-md border border-dashed border-gray-200 bg-gray-50 p-2">
+                        <p className="text-xs font-medium text-gray-600">
+                          AI 候选类目{group.aiAnalyzedTitle ? `（分析标题：${group.aiAnalyzedTitle}）` : ''}
+                        </p>
+                        {group.aiCategoryCandidates.map((candidate) => (
+                          <div
+                            key={`${group.erpId}-${candidate.categoryId}`}
+                            className="flex items-start justify-between gap-3 rounded-md bg-white px-2 py-2"
+                          >
+                            <div className="space-y-1">
+                              <p className="text-xs text-gray-700">{candidate.categoryPath.join(' > ')}</p>
+                              <p className="text-[11px] text-gray-400">{candidate.reason}</p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => applyAICandidate(group.erpId, candidate)}
+                              disabled={isFetching || hasActiveSingleRetry}
+                            >
+                              应用
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-4 py-2 text-center text-gray-500">{group.rows.length}</td>
                 <td className="px-4 py-2">
@@ -393,10 +334,15 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                   />
                 </td>
                 <td className="px-4 py-2">
+                  {renderCategorySource(group)}
+                </td>
+                <td className="px-4 py-2">
                   {group.recommendedCategoryId ? (
                     <Badge className="bg-green-100 text-green-700 hover:bg-green-100">已填写</Badge>
-                  ) : group.categoryLookupError ? (
-                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">获取失败</Badge>
+                  ) : group.aiCategoryCandidates?.length ? (
+                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">待确认</Badge>
+                  ) : group.categoryLookupError || group.aiCategoryError ? (
+                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">待处理</Badge>
                   ) : (
                     <Badge variant="outline" className="text-gray-400">待填写</Badge>
                   )}

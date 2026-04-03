@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { translateAICategoryCandidates } from '@/lib/category-translation';
 import { getAccessToken } from '@/lib/tiktok-token';
 import { fetchLeafCategories } from '@/lib/tiktok-category-tree';
 import { analyzeCategoryWithOpenRouter } from '@/lib/openrouter-category-match';
@@ -68,8 +69,12 @@ export async function POST(request: NextRequest) {
     const accessToken = await getAccessToken();
     const leafCategories = await fetchLeafCategories(appKey, appSecret, shopCipher, accessToken);
     const result = await analyzeCategoryWithOpenRouter(analyzedTitle, leafCategories);
+    const translatedCandidates = await translateAICategoryCandidates(result.candidates);
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      candidates: translatedCandidates,
+    });
   } catch (error) {
     console.error('TikTok Category AI API error:', error);
     return NextResponse.json(

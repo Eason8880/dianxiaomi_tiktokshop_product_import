@@ -49,7 +49,13 @@ export async function fetchRecommendedCategory(
   return {
     categories: (data.categories || []).map((cat: Record<string, unknown>) => ({
       categoryId: String(cat.id || cat.category_id || ''),
-      categoryName: String(cat.local_name || cat.name || cat.category_name || ''),
+      categoryName: String(
+        (Array.isArray(cat.categoryPath) ? cat.categoryPath[cat.categoryPath.length - 1] : undefined) ||
+          cat.local_name ||
+          cat.name ||
+          cat.category_name ||
+          ''
+      ),
       confidence: Number(cat.confidence || 0),
       isLeaf: Boolean(cat.is_leaf),
       categoryPath: Array.isArray(cat.categoryPath) ? (cat.categoryPath as string[]) : undefined,
@@ -70,7 +76,6 @@ export async function analyzeCategoryWithAI(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       productTitle,
-      categoryLookupTitle: productTitle,
       region,
     }),
   });
@@ -118,7 +123,7 @@ export async function fetchCategoryForGroup(
     String(firstRow['商品主图'] || ''),
     String(firstRow['商品图片2'] || ''),
   ].filter(Boolean);
-  const lookupTitle = group.categoryLookupTitle || group.productTitle;
+  const lookupTitle = group.productTitle || group.chineseName;
 
   try {
     const result = await fetchRecommendedCategory(
@@ -133,6 +138,10 @@ export async function fetchCategoryForGroup(
       return {
         group: {
           ...group,
+          recommendedCategoryId: undefined,
+          categorySource: undefined,
+          categoryName: undefined,
+          categoryPath: undefined,
           categoryLookupError: '未返回可用类目',
         },
         error: '未返回可用类目',
@@ -143,6 +152,7 @@ export async function fetchCategoryForGroup(
       group: {
         ...group,
         recommendedCategoryId: bestCategory.categoryId,
+        categorySource: 'tiktok',
         categoryName: bestCategory.categoryName,
         categoryPath: bestCategory.categoryPath,
         categoryLookupError: undefined,
@@ -157,6 +167,10 @@ export async function fetchCategoryForGroup(
     return {
       group: {
         ...group,
+        recommendedCategoryId: undefined,
+        categorySource: undefined,
+        categoryName: undefined,
+        categoryPath: undefined,
         categoryLookupError: message,
       },
       error: message,
@@ -168,7 +182,7 @@ export async function analyzeCategoryForGroupWithAI(
   group: ProductGroup,
   region: string
 ): Promise<AICategoryLookupResult> {
-  const lookupTitle = group.categoryLookupTitle || group.productTitle;
+  const lookupTitle = group.productTitle || group.chineseName;
 
   try {
     const result = await analyzeCategoryWithAI(lookupTitle, region);
