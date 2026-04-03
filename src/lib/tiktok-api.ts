@@ -1,5 +1,13 @@
 import { ProductGroup, CategoryRecommendation } from '@/types';
 
+function stripHtml(text: string): string {
+  return text
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Fetch recommended categories for a product via the server-side API proxy.
  */
@@ -62,10 +70,13 @@ export async function batchFetchCategories(
         String(firstRow['商品图片2'] || ''),
       ].filter(Boolean);
 
+      const rawDesc = String(firstRow['描述（不包括图片）'] || firstRow['商品描述'] || '');
+      const description = stripHtml(rawDesc).substring(0, 500);
+
       const categories = await fetchRecommendedCategory(
         group.productTitle,
         region,
-        String(firstRow['描述（不包括图片）'] || '').substring(0, 500),
+        description,
         images
       );
 
