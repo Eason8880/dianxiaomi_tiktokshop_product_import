@@ -34,7 +34,7 @@ export async function fetchRecommendedCategory(
 
   return (data.categories || []).map((cat: Record<string, unknown>) => ({
     categoryId: String(cat.id || cat.category_id || ''),
-    categoryName: String(cat.local_name || cat.category_name || cat.name || ''),
+    categoryName: String(cat.local_name || cat.name || cat.category_name || ''),
     confidence: Number(cat.confidence || 0),
     categoryPath: Array.isArray(cat.categoryPath) ? (cat.categoryPath as string[]) : undefined,
   }));

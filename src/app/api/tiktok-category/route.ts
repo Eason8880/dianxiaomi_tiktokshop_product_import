@@ -38,11 +38,11 @@ function generateSignature(
 
 interface TikTokCategory {
   id: string;
-  name: string;
+  name?: string;
+  local_name?: string;
   parent_id?: string;
   is_leaf?: boolean;
   level?: number;
-  local_display_name?: string;
   permission_statuses?: string[];
 }
 
@@ -100,7 +100,7 @@ async function fetchCategoryPathMap(
     if (pathMap.has(id)) return pathMap.get(id)!;
     const cat = catMap.get(id);
     if (!cat) return [];
-    const name = cat.local_display_name || cat.name || id;
+    const name = cat.local_name || cat.name || id;
     const parentId = String(cat.parent_id || '');
     if (!parentId || parentId === '0' || parentId === '') {
       const path = [name];
