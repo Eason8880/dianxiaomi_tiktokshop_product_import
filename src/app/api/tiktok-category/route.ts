@@ -20,7 +20,7 @@ function generateSignature(
   appSecret: string
 ): string {
   const sortedKeys = Object.keys(queryParams)
-    .filter((k) => k !== 'sign' && k !== 'access_token')
+    .filter((k) => k !== 'sign')
     .sort();
 
   let baseString = path;
@@ -120,7 +120,6 @@ export async function POST(request: NextRequest) {
     const queryString = new URLSearchParams({
       ...queryParams,
       sign,
-      access_token: accessToken,
     }).toString();
 
     const apiUrl = `https://open-api.tiktokglobalshop.com${apiPath}?${queryString}`;
