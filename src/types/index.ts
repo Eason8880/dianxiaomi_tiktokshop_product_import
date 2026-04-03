@@ -27,13 +27,6 @@ export interface PriceParams {
   additionalCost: number;     // Fixed additional cost per item in RMB
 }
 
-// TikTok API credentials
-export interface TikTokApiConfig {
-  appKey: string;
-  appSecret: string;
-  accessToken: string;
-}
-
 // Product group (multiple SKU rows sharing the same ERP ID)
 export interface ProductGroup {
   erpId: string;
@@ -60,7 +53,6 @@ export interface AppState {
   sourceHeaders: string[];
   columnMappings: ColumnMapping[];
   priceParams: PriceParams;
-  tiktokConfig: TikTokApiConfig;
   productGroups: ProductGroup[];
   warehouseName: string;
   defaultBrand: string;

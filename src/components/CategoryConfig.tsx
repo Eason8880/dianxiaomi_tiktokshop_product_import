@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ProductGroup } from '@/types';
 import { batchFetchCategories } from '@/lib/tiktok-api';
 import { Button } from '@/components/ui/button';
@@ -9,22 +9,42 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+interface Region {
+  code: string;
+  name: string;
+}
+
 interface CategoryConfigProps {
   groups: ProductGroup[];
   onGroupsUpdate: (groups: ProductGroup[]) => void;
 }
 
-export function CategoryConfig({
-  groups,
-  onGroupsUpdate,
-}: CategoryConfigProps) {
+export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) {
   const [isFetching, setIsFetching] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentProduct, setCurrentProduct] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    fetch('/api/tiktok-shops')
+      .then((r) => r.json())
+      .then((data) => {
+        setRegions(data.regions || []);
+        if (data.regions?.length > 0) {
+          setSelectedRegion(data.regions[0].code);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   async function handleFetchAll() {
+    if (!selectedRegion) {
+      setError('请选择目标国家/地区');
+      return;
+    }
     setError(null);
     setIsFetching(true);
     setProgress(0);
@@ -34,6 +54,7 @@ export function CategoryConfig({
     try {
       const updated = await batchFetchCategories(
         groups,
+        selectedRegion,
         (current, total, erpId) => {
           setProgress(total > 0 ? Math.round((current / total) * 100) : 0);
           setCurrentProduct(erpId);
@@ -65,11 +86,35 @@ export function CategoryConfig({
 
   return (
     <div className="space-y-6">
-      {/* Batch fetch */}
-      <div className="flex items-center gap-3">
+      {/* Region selector + batch fetch */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {regions.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 whitespace-nowrap">目标国家</span>
+            <div className="flex gap-1.5">
+              {regions.map((r) => (
+                <button
+                  key={r.code}
+                  onClick={() => setSelectedRegion(r.code)}
+                  disabled={isFetching}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors border ${
+                    selectedRegion === r.code
+                      ? 'bg-black text-white border-black'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                  }`}
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">未配置店铺信息</span>
+        )}
+
         <Button
           onClick={handleFetchAll}
-          disabled={isFetching}
+          disabled={isFetching || !selectedRegion}
           className="gap-2"
         >
           {isFetching ? (
@@ -84,7 +129,7 @@ export function CategoryConfig({
         {isFetching && (
           <Button variant="outline" size="sm" onClick={handleStop}>停止</Button>
         )}
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 ml-auto">
           已填写 {filledCount} / {groups.length} 个产品
         </span>
       </div>

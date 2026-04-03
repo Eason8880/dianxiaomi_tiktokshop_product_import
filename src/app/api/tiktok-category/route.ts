@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { getAccessToken } from '@/lib/tiktok-token';
 
 interface RecommendCategoryRequest {
   productTitle: string;
   description?: string;
   images?: string[];
+  region: string;
 }
 
 /**
@@ -17,22 +19,18 @@ function generateSignature(
   body: string,
   appSecret: string
 ): string {
-  // 1. Sort query params by key (excluding sign and access_token)
   const sortedKeys = Object.keys(queryParams)
     .filter((k) => k !== 'sign' && k !== 'access_token')
     .sort();
 
-  // 2. Concatenate: path + sorted params + body
   let baseString = path;
   for (const key of sortedKeys) {
     baseString += key + queryParams[key];
   }
   baseString += body;
 
-  // 3. Wrap with app_secret
   const signString = appSecret + baseString + appSecret;
 
-  // 4. HMAC-SHA256
   return crypto
     .createHmac('sha256', appSecret)
     .update(signString)
@@ -42,16 +40,30 @@ function generateSignature(
 export async function POST(request: NextRequest) {
   try {
     const body: RecommendCategoryRequest = await request.json();
-    const { productTitle, description, images } = body;
+    const { productTitle, description, images, region } = body;
 
     const appKey = process.env.TIKTOK_APP_KEY;
     const appSecret = process.env.TIKTOK_APP_SECRET;
-    const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
+    const shopsEnv = process.env.TIKTOK_SHOPS;
 
-    if (!appKey || !appSecret || !accessToken) {
+    if (!appKey || !appSecret) {
       return NextResponse.json(
-        { error: '服务端未配置 TikTok API 凭证，请联系管理员' },
+        { error: '服务端未配置 TikTok API 凭证（APP_KEY / APP_SECRET）' },
         { status: 500 }
+      );
+    }
+
+    if (!shopsEnv) {
+      return NextResponse.json(
+        { error: '服务端未配置 TIKTOK_SHOPS' },
+        { status: 500 }
+      );
+    }
+
+    if (!region) {
+      return NextResponse.json(
+        { error: '缺少必要参数：region' },
+        { status: 400 }
       );
     }
 
@@ -61,6 +73,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    let shops: Record<string, string>;
+    try {
+      shops = JSON.parse(shopsEnv);
+    } catch {
+      return NextResponse.json(
+        { error: 'TIKTOK_SHOPS 格式错误，应为 JSON 对象' },
+        { status: 500 }
+      );
+    }
+
+    const shopCipher = shops[region];
+    if (!shopCipher) {
+      return NextResponse.json(
+        { error: `未配置 ${region} 地区的店铺 cipher` },
+        { status: 400 }
+      );
+    }
+
+    const accessToken = await getAccessToken();
 
     const apiPath = '/product/202309/categories/recommend';
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -72,13 +104,14 @@ export async function POST(request: NextRequest) {
       requestBody.description = description;
     }
     if (images && images.length > 0) {
-      requestBody.images = images.map((url) => ({ url }));
+      requestBody.images = images.map((url) => ({ uri: url }));
     }
 
     const bodyString = JSON.stringify(requestBody);
 
     const queryParams: Record<string, string> = {
       app_key: appKey,
+      shop_cipher: shopCipher,
       timestamp,
     };
 
@@ -110,7 +143,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract category recommendations
     const categories = data.data?.categories || data.data?.category_list || [];
     return NextResponse.json({ categories });
   } catch (error) {

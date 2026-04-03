@@ -5,6 +5,7 @@ import { ProductGroup, CategoryRecommendation } from '@/types';
  */
 export async function fetchRecommendedCategory(
   productTitle: string,
+  region: string,
   description?: string,
   images?: string[]
 ): Promise<CategoryRecommendation[]> {
@@ -13,6 +14,7 @@ export async function fetchRecommendedCategory(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       productTitle,
+      region,
       description,
       images: images?.slice(0, 3),
     }),
@@ -36,6 +38,7 @@ export async function fetchRecommendedCategory(
  */
 export async function batchFetchCategories(
   groups: ProductGroup[],
+  region: string,
   onProgress: (current: number, total: number, groupId: string) => void,
   signal?: AbortSignal
 ): Promise<ProductGroup[]> {
@@ -56,12 +59,12 @@ export async function batchFetchCategories(
 
       const categories = await fetchRecommendedCategory(
         group.productTitle,
+        region,
         String(firstRow['描述（不包括图片）'] || '').substring(0, 500),
         images
       );
 
       if (categories.length > 0) {
-        // Pick the top-confidence result
         const sorted = [...categories].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
         updated[i] = {
           ...group,
