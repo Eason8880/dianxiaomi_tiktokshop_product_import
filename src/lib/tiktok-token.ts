@@ -61,11 +61,12 @@ export async function getAccessToken(): Promise<string> {
     throw new Error(data.message || 'Token 刷新失败');
   }
 
-  cachedAccessToken = data.data.access_token;
+  const newToken: string = data.data.access_token;
+  cachedAccessToken = newToken;
   // TikTok tokens typically expire in access_token_expire_in seconds
   const expiresIn = data.data.access_token_expire_in || 0;
   tokenExpiresAt = Date.now() + expiresIn * 1000;
 
   console.log(`[TikTok Token] Refreshed, expires in ${expiresIn}s`);
-  return cachedAccessToken;
+  return newToken;
 }
