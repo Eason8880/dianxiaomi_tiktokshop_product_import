@@ -28,6 +28,7 @@ export async function fetchRecommendedCategory(
     categoryId: String(cat.id || cat.category_id || ''),
     categoryName: String(cat.local_name || cat.category_name || cat.name || ''),
     confidence: Number(cat.confidence || 0),
+    categoryPath: Array.isArray(cat.categoryPath) ? (cat.categoryPath as string[]) : undefined,
   }));
 }
 
@@ -74,6 +75,7 @@ export async function batchFetchCategories(
           ...group,
           recommendedCategoryId: sorted[0].categoryId,
           categoryName: sorted[0].categoryName,
+          categoryPath: sorted[0].categoryPath,
         };
       }
     } catch (err) {

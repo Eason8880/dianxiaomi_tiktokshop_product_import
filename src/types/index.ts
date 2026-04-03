@@ -37,6 +37,7 @@ export interface ProductGroup {
   hasSizeVariant: boolean;
   recommendedCategoryId?: string;
   categoryName?: string;
+  categoryPath?: string[]; // full hierarchy path from root to leaf
 }
 
 // Category recommendation result
@@ -44,6 +45,7 @@ export interface CategoryRecommendation {
   categoryId: string;
   categoryName: string;
   confidence?: number;
+  categoryPath?: string[]; // full path from root to leaf, e.g. ["Fashion", "Accessories", "Rings"]
 }
 
 // App state

@@ -187,9 +187,18 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                   <p className="text-gray-800 text-xs truncate max-w-[320px]" title={group.productTitle}>
                     {group.productTitle || group.chineseName}
                   </p>
-                  {group.categoryName && (
+                  {group.categoryPath && group.categoryPath.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-0.5 mt-0.5">
+                      {group.categoryPath.map((seg, idx) => (
+                        <span key={idx} className="flex items-center gap-0.5">
+                          {idx > 0 && <span className="text-gray-300 text-xs">›</span>}
+                          <span className="text-gray-400 text-xs">{seg}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : group.categoryName ? (
                     <p className="text-gray-400 text-xs mt-0.5">{group.categoryName}</p>
-                  )}
+                  ) : null}
                 </td>
                 <td className="px-4 py-2 text-center text-gray-500">{group.rows.length}</td>
                 <td className="px-4 py-2">

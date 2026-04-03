@@ -5,7 +5,6 @@ import { getAccessToken } from '@/lib/tiktok-token';
 interface RecommendCategoryRequest {
   productTitle: string;
   description?: string;
-  images?: string[];
   region: string;
 }
 
@@ -31,22 +30,100 @@ function generateSignature(
 
   const signString = appSecret + baseString + appSecret;
 
-  const result = crypto
+  return crypto
     .createHmac('sha256', appSecret)
     .update(signString)
     .digest('hex');
+}
 
-  console.log('[Sign Debug] sortedKeys:', sortedKeys);
-  console.log('[Sign Debug] baseString (no secret):', baseString);
-  console.log('[Sign Debug] sign:', result);
+interface TikTokCategory {
+  id: string;
+  name: string;
+  parent_id?: string;
+  is_leaf?: boolean;
+  level?: number;
+  local_display_name?: string;
+  permission_statuses?: string[];
+}
 
-  return result;
+/**
+ * Fetch the full TikTok category tree and return a map of id -> ancestor path (names from root to self).
+ */
+async function fetchCategoryPathMap(
+  appKey: string,
+  appSecret: string,
+  shopCipher: string,
+  accessToken: string
+): Promise<Map<string, string[]>> {
+  const apiPath = '/product/202309/categories';
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  const queryParams: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shopCipher,
+    timestamp,
+    locale: 'en',
+  };
+
+  const sign = generateSignature(apiPath, queryParams, '', appSecret);
+
+  const queryString = new URLSearchParams({ ...queryParams, sign }).toString();
+  const apiUrl = `https://open-api.tiktokglobalshop.com${apiPath}?${queryString}`;
+
+  const response = await fetch(apiUrl, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-tts-access-token': accessToken,
+    },
+  });
+
+  const data = await response.json();
+
+  if (data.code !== 0) {
+    console.error('[Category Tree] API error:', data.code, data.message);
+    return new Map();
+  }
+
+  const categories: TikTokCategory[] = data.data?.category_list || data.data?.categories || [];
+
+  // Build id -> category map
+  const catMap = new Map<string, TikTokCategory>();
+  for (const cat of categories) {
+    catMap.set(String(cat.id), cat);
+  }
+
+  // Build id -> full path (names from root to self)
+  const pathMap = new Map<string, string[]>();
+
+  function buildPath(id: string): string[] {
+    if (pathMap.has(id)) return pathMap.get(id)!;
+    const cat = catMap.get(id);
+    if (!cat) return [];
+    const name = cat.local_display_name || cat.name || id;
+    const parentId = String(cat.parent_id || '');
+    if (!parentId || parentId === '0' || parentId === '') {
+      const path = [name];
+      pathMap.set(id, path);
+      return path;
+    }
+    const parentPath = buildPath(parentId);
+    const path = [...parentPath, name];
+    pathMap.set(id, path);
+    return path;
+  }
+
+  for (const cat of categories) {
+    buildPath(String(cat.id));
+  }
+
+  return pathMap;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: RecommendCategoryRequest = await request.json();
-    const { productTitle, description, images, region } = body;
+    const { productTitle, description, region } = body;
 
     const appKey = process.env.TIKTOK_APP_KEY;
     const appSecret = process.env.TIKTOK_APP_SECRET;
@@ -100,6 +177,7 @@ export async function POST(request: NextRequest) {
 
     const accessToken = await getAccessToken();
 
+    // Fetch recommended category
     const apiPath = '/product/202309/categories/recommend';
     const timestamp = Math.floor(Date.now() / 1000).toString();
 
@@ -109,7 +187,6 @@ export async function POST(request: NextRequest) {
     if (description) {
       requestBody.description = description;
     }
-    // images 需要先通过 Upload Product Image API 上传后才能传 URI，暂不传图片
 
     const bodyString = JSON.stringify(requestBody);
 
@@ -146,8 +223,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const categories = data.data?.categories || data.data?.category_list || [];
-    console.log('[Category Debug] raw first item:', JSON.stringify(categories[0], null, 2));
+    const rawCategories: TikTokCategory[] = data.data?.categories || data.data?.category_list || [];
+
+    // Fetch full category tree to resolve hierarchy paths
+    const pathMap = await fetchCategoryPathMap(appKey, appSecret, shopCipher, accessToken);
+
+    const categories = rawCategories.map((cat) => {
+      const id = String(cat.id || '');
+      const path = pathMap.get(id) || [];
+      return {
+        ...cat,
+        categoryPath: path,
+      };
+    });
+
     return NextResponse.json({ categories });
   } catch (error) {
     console.error('TikTok Category API error:', error);
