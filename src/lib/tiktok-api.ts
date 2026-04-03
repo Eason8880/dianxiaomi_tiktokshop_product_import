@@ -63,15 +63,8 @@ export async function batchFetchCategories(
         String(firstRow['商品图片2'] || ''),
       ].filter(Boolean);
 
-      const titleTruncated = (() => {
-        const t = group.productTitle;
-        if (t.length <= 50) return t;
-        const cut = t.lastIndexOf(' ', 50);
-        return cut > 0 ? t.substring(0, cut) : t.substring(0, 50);
-      })();
-
       const categories = await fetchRecommendedCategory(
-        titleTruncated,
+        group.productTitle,
         region,
         undefined,
         images
@@ -98,9 +91,9 @@ export async function batchFetchCategories(
       console.error(`Failed to fetch category for ERP ID ${group.erpId}:`, err);
     }
 
-    // Rate limiting: 500ms between requests
+    // Rate limiting: 1s between requests
     if (i < updated.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
