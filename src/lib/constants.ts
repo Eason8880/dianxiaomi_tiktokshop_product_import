@@ -163,7 +163,7 @@ export const DEFAULT_MAPPINGS: ColumnMapping[] = [
   { targetColumn: '*宽(cm)\n（必填）', sourceColumn: '商品宽度(cm)', transform: 'none' },
   { targetColumn: '*高(cm)\n（必填）', sourceColumn: '商品高度(cm)', transform: 'none' },
   { targetColumn: '*仓库名称\n（必填）', sourceColumn: null, transform: 'fixedValue', fixedValue: '' },
-  { targetColumn: '货到付款', sourceColumn: null, transform: 'none' },
+  { targetColumn: '货到付款', sourceColumn: null, transform: 'fixedValue', fixedValue: '是' },
   { targetColumn: '来源URL', sourceColumn: null, transform: 'none' },
 ];
 

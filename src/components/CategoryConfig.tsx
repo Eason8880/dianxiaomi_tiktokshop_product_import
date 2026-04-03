@@ -35,7 +35,9 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
       .then((data) => {
         setRegions(data.regions || []);
         if (data.regions?.length > 0) {
-          setSelectedRegion(data.regions[0].code);
+          const preferredRegion =
+            data.regions.find((region: Region) => region.code === 'PH') || data.regions[0];
+          setSelectedRegion(preferredRegion.code);
         }
       })
       .catch(() => {});
