@@ -1,7 +1,7 @@
 'use client';
 
 import type { Dispatch, SetStateAction } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ProductGroup, VariantDimension } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,6 +91,20 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
   const [singleAnalyzingIds, setSingleAnalyzingIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const hasAutoTriggered = useRef(false);
+
+  // Auto-trigger on mount if there are products needing analysis
+  useEffect(() => {
+    if (hasAutoTriggered.current) return;
+    const needsAnalysis = groups.some(
+      (g) => classifyGroup(g) === 'has_attrs' && !g.variantAnalysisStatus
+    );
+    if (needsAnalysis) {
+      hasAutoTriggered.current = true;
+      handleAnalyzeAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function callAnalyzeAPI(
     batch: ProductGroup[],
@@ -124,7 +138,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
     setProgress(0);
     abortRef.current = new AbortController();
 
-    const chunks = chunkArray(toAnalyze, 5);
+    const chunks = chunkArray(toAnalyze, 20);
     try {
       for (let i = 0; i < chunks.length; i++) {
         if (abortRef.current.signal.aborted) break;

@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       .join(',\n  ');
 
     const { content } = await callOpenRouterChat({
-      timeoutMs: 30_000,
+      timeoutMs: 45_000,
       temperature: 0,
       messages: [
         {
