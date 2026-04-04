@@ -11,10 +11,12 @@ interface OpenRouterChatOptions {
   temperature?: number;
   responseFormat?: { type: 'json_object' } | null;
   timeoutMs?: number;
+  provider?: Record<string, unknown>;
 }
 
 export const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-export const OPENROUTER_DEFAULT_MODEL = 'openai/gpt-oss-120b';
+export const OPENROUTER_DEFAULT_MODEL = 'openai/gpt-4o-mini';
+export const OPENROUTER_FALLBACK_MODELS = ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b'];
 
 function getOpenRouterApiKey(): string | undefined {
   return process.env.OPENROUTER_API_KEY?.trim();
@@ -34,6 +36,7 @@ export async function callOpenRouterChat({
   temperature = 0.1,
   responseFormat = { type: 'json_object' },
   timeoutMs = 30_000,
+  provider,
 }: OpenRouterChatOptions): Promise<{ content: string; model: string }> {
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
@@ -50,8 +53,13 @@ export async function callOpenRouterChat({
       },
       body: JSON.stringify({
         model: resolveOpenRouterModel(model),
+        models: [
+          resolveOpenRouterModel(model),
+          ...OPENROUTER_FALLBACK_MODELS.filter((m) => m !== resolveOpenRouterModel(model)),
+        ],
         temperature,
         ...(responseFormat ? { response_format: responseFormat } : {}),
+        provider: provider ?? { sort: 'throughput' },
         messages,
       }),
       timeoutMs,
