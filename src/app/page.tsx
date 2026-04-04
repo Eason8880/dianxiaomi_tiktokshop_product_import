@@ -9,6 +9,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { DataPreview } from '@/components/DataPreview';
 import { ColumnMappingEditor } from '@/components/ColumnMapping';
 import { PriceCalculator } from '@/components/PriceCalculator';
+import { VariantAnalysis } from '@/components/VariantAnalysis';
 import { CategoryConfig } from '@/components/CategoryConfig';
 import { ExportPreview } from '@/components/ExportPreview';
 import { Button } from '@/components/ui/button';
@@ -20,9 +21,10 @@ import { Badge } from '@/components/ui/badge';
 const STEPS = [
   { id: 1, title: '上传数据', desc: '上传 ERP 导出的商品表格' },
   { id: 2, title: '列映射', desc: '配置字段对应关系' },
-  { id: 3, title: '定价设置', desc: '配置售价计算公式' },
-  { id: 4, title: '推荐类目', desc: '获取 TikTok 上架分类' },
-  { id: 5, title: '导出', desc: '预览并下载上架表格' },
+  { id: 3, title: '变种分析', desc: 'AI 分析变种维度结构' },
+  { id: 4, title: '定价设置', desc: '配置售价计算公式' },
+  { id: 5, title: '推荐类目', desc: '获取 TikTok 上架分类' },
+  { id: 6, title: '导出', desc: '预览并下载上架表格' },
 ];
 
 export default function Home() {
@@ -164,6 +166,13 @@ export default function Home() {
             )}
 
             {step === 3 && (
+              <VariantAnalysis
+                groups={productGroups}
+                onGroupsUpdate={setProductGroups}
+              />
+            )}
+
+            {step === 4 && (
               <PriceCalculator
                 params={priceParams}
                 sampleRows={sourceRows}
@@ -171,14 +180,14 @@ export default function Home() {
               />
             )}
 
-            {step === 4 && (
+            {step === 5 && (
               <CategoryConfig
                 groups={productGroups}
                 onGroupsUpdate={setProductGroups}
               />
             )}
 
-            {step === 5 && (
+            {step === 6 && (
               <ExportPreview rows={targetRows} />
             )}
           </CardContent>
@@ -193,12 +202,12 @@ export default function Home() {
           >
             上一步
           </Button>
-          {step < 5 && (
+          {step < 6 && (
             <Button
-              onClick={() => setStep((s) => Math.min(5, s + 1))}
+              onClick={() => setStep((s) => Math.min(6, s + 1))}
               disabled={!hasData}
             >
-              {step === 4 ? '前往导出' : '下一步'}
+              {step === 5 ? '前往导出' : '下一步'}
             </Button>
           )}
         </div>

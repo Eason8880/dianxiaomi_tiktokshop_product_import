@@ -39,7 +39,9 @@ export function applyMappings(
     const targetRow: TargetRow = {};
     const erpId = String(sourceRow['ERP ID'] || '');
     const group = groupMap.get(erpId);
-    const isVariantProduct = group ? group.rows.length > 1 || group.hasColorVariant : false;
+    const isVariantProduct = group
+      ? group.rows.length > 1 || group.hasColorVariant || Boolean(group.variantDim1)
+      : false;
 
     for (const mapping of mappings) {
       const { targetColumn, sourceColumn, transform, fixedValue } = mapping;
@@ -68,14 +70,34 @@ export function applyMappings(
 
       // Handle fixed value
       if (transform === 'fixedValue') {
-        // For variant attribute names, only fill if product has variants
+        // For variant attribute names, prefer AI-analyzed name, then fall back to fixed/default
         if (targetColumn === '变种属性名称一') {
-          value = isVariantProduct ? (fixedValue || 'Color') : '';
+          value = group?.variantDim1
+            ? group.variantDim1.name
+            : (isVariantProduct ? (fixedValue || 'Color') : '');
         } else if (targetColumn === '变种属性名称二') {
-          value = (isVariantProduct && group?.hasSizeVariant) ? (fixedValue || 'Size') : '';
+          if (group?.variantDim2) {
+            value = group.variantDim2.name;
+          } else {
+            value = (isVariantProduct && group?.hasSizeVariant) ? (fixedValue || 'Size') : '';
+          }
         } else {
           value = fixedValue || '';
         }
+        targetRow[targetColumn] = value;
+        continue;
+      }
+
+      // AI-analyzed variant values: look up 产品属性 → dim value
+      if (targetColumn === '变种属性值一' && group?.variantDim1) {
+        const key = String(sourceRow['产品属性'] || '').trim();
+        value = group.variantDim1.valueMap[key] ?? '';
+        targetRow[targetColumn] = value;
+        continue;
+      }
+      if (targetColumn === '变种属性值二' && group?.variantDim2) {
+        const key = String(sourceRow['产品属性'] || '').trim();
+        value = group.variantDim2.valueMap[key] ?? '';
         targetRow[targetColumn] = value;
         continue;
       }
@@ -104,8 +126,8 @@ export function applyMappings(
         }
       }
 
-      // For size variant columns, clear if product has no size variant
-      if (isVariantProduct && !group?.hasSizeVariant) {
+      // For size variant columns, clear if product has neither hasSizeVariant nor AI dim2
+      if (isVariantProduct && !group?.hasSizeVariant && !group?.variantDim2) {
         if (['变种属性名称二', '变种属性值二'].includes(targetColumn)) {
           value = '';
         }

@@ -8,6 +8,12 @@ export interface TargetRow {
   [key: string]: string | number;
 }
 
+// Variant dimension produced by AI analysis
+export interface VariantDimension {
+  name: string; // English label: "Color", "Size", "Length", etc.
+  valueMap: Record<string, string>; // raw 产品属性 string → extracted value for this dimension
+}
+
 // Column mapping configuration
 export interface ColumnMapping {
   targetColumn: string;
@@ -35,6 +41,11 @@ export interface ProductGroup {
   rows: SourceRow[];
   hasColorVariant: boolean;
   hasSizeVariant: boolean;
+  variantAnalysisStatus?: 'pending' | 'done' | 'error';
+  variantAnalysisError?: string;
+  variantDimCount?: 1 | 2;
+  variantDim1?: VariantDimension;
+  variantDim2?: VariantDimension;
   categoryLookupTitle?: string;
   categoryLookupError?: string;
   categoryMatchedTitle?: string;
