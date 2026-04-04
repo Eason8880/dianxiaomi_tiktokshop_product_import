@@ -81,18 +81,20 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are a product variant dimension analyst for a Chinese e-commerce system.
-Analyze variant attribute strings and determine their dimension structure.
+          content: `You are a product variant dimension analyst for a Chinese e-commerce system targeting TikTok Shop.
+Analyze variant attribute strings, determine their dimension structure, and translate all values to English.
 
 Rules:
 1. Dimension names must be in English: Color, Size, Length, Weight, Style, Material, Pattern, etc.
 2. If all attributes represent a single concept (e.g. colors only, styles only), output dimensions=1.
 3. If attributes combine two concepts (e.g. "黑色-XS" = Color + Size, "绿-1.2米" = Color + Length), output dimensions=2.
-4. The splits map must include every attribute string from the input, exactly as provided.
-5. For dimensions=1 each splits entry has exactly one element equal to the attribute value.
-6. For dimensions=2 each splits entry has exactly two elements: [dim1_value, dim2_value].
-7. Be consistent: the same sub-string must always map to the same dimension across a product.
-8. Return only valid JSON, no markdown, no explanation.`,
+4. The splits map must include every attribute string from the input, exactly as provided as keys.
+5. For dimensions=1 each splits entry has exactly one element: the English translation of the value.
+6. For dimensions=2 each splits entry has exactly two elements: [English_dim1_value, English_dim2_value].
+7. ALL split values must be in English. Translate Chinese color/size/style names to standard English (e.g. 黑色→Black, 红色→Red, 蓝色→Blue, 绿色→Green, 粉色→Pink, 白色→White, 灰色→Gray, 黄色→Yellow, 紫色→Purple, 橙色→Orange, 咖啡色→Coffee, 藏青→Navy Blue).
+8. For sizes keep standard abbreviations: XS, S, M, L, XL, XXL. For lengths keep numeric+unit (e.g. "1.2M", "1.5M").
+9. Be consistent: the same Chinese sub-string must always map to the same English value across a product.
+10. Return only valid JSON, no markdown, no explanation.`,
         },
         {
           role: 'user',
@@ -103,7 +105,7 @@ Products:
   ${productList}
 ]
 
-Example output for reference:
+Example output for reference (note: all split values must be in English):
 {
   "results": [
     {
@@ -111,13 +113,20 @@ Example output for reference:
       "dimensions": 2,
       "dim1_name": "Color",
       "dim2_name": "Size",
-      "splits": {"黑色-XS": ["黑色","XS"], "黑色-S": ["黑色","S"], "蓝色-M": ["蓝色","M"]}
+      "splits": {"黑色-XS": ["Black","XS"], "黑色-S": ["Black","S"], "蓝色-M": ["Blue","M"]}
     },
     {
       "erpId": "002",
       "dimensions": 1,
       "dim1_name": "Color",
-      "splits": {"藏青": ["藏青"], "卡其": ["卡其"], "酒红": ["酒红"]}
+      "splits": {"藏青": ["Navy Blue"], "卡其": ["Khaki"], "酒红": ["Wine Red"]}
+    },
+    {
+      "erpId": "003",
+      "dimensions": 2,
+      "dim1_name": "Color",
+      "dim2_name": "Length",
+      "splits": {"绿-1.2米枪柄": ["Green","1.2M"], "蓝-1.5米枪柄": ["Blue","1.5M"]}
     }
   ]
 }
