@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
+
 interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -36,7 +38,7 @@ export async function callOpenRouterChat({
     throw new Error('未配置 OPENROUTER_API_KEY');
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${process.env.OPENROUTER_BASE_URL || OPENROUTER_DEFAULT_BASE_URL}/chat/completions`,
     {
       method: 'POST',
@@ -50,6 +52,8 @@ export async function callOpenRouterChat({
         ...(responseFormat ? { response_format: responseFormat } : {}),
         messages,
       }),
+      timeoutMs: 30_000,
+      timeoutMessage: 'OpenRouter 请求超时，请稍后重试',
     }
   );
 

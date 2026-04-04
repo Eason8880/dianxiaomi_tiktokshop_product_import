@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
+
 /**
  * TikTok Shop Access Token manager.
  *
@@ -44,9 +46,13 @@ export async function getAccessToken(): Promise<string> {
     grant_type: 'refresh_token',
   });
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://auth.tiktok-shops.com/api/v2/token/refresh?${params.toString()}`,
-    { method: 'GET' }
+    {
+      method: 'GET',
+      timeoutMs: 10_000,
+      timeoutMessage: 'TikTok Token 刷新超时',
+    }
   );
 
   const data = await response.json();

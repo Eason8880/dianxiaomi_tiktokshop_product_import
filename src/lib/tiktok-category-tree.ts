@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 
 export interface TikTokCategory {
   id: string;
@@ -69,12 +70,14 @@ async function fetchRawCategoryTree(
   const queryString = new URLSearchParams({ ...queryParams, sign }).toString();
   const apiUrl = `https://open-api.tiktokglobalshop.com${apiPath}?${queryString}`;
 
-  const response = await fetch(apiUrl, {
+  const response = await fetchWithTimeout(apiUrl, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
       'x-tts-access-token': accessToken,
     },
+    timeoutMs: 15_000,
+    timeoutMessage: '获取 TikTok 类目树超时',
   });
 
   const data = await response.json();

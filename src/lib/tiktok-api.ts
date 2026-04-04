@@ -1,4 +1,5 @@
 import { AICategoryCandidate, ProductGroup, CategoryRecommendation } from '@/types';
+import { fetchWithTimeout, isAbortError } from '@/lib/fetch-timeout';
 
 export interface CategoryFetchResponse {
   categories: CategoryRecommendation[];
@@ -29,9 +30,10 @@ export async function fetchRecommendedCategory(
   productTitle: string,
   region: string,
   description?: string,
-  images?: string[]
+  images?: string[],
+  signal?: AbortSignal
 ): Promise<CategoryFetchResponse> {
-  const response = await fetch('/api/tiktok-category', {
+  const response = await fetchWithTimeout('/api/tiktok-category', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -39,6 +41,9 @@ export async function fetchRecommendedCategory(
       region,
       description,
     }),
+    signal,
+    timeoutMs: 25_000,
+    timeoutMessage: 'TikTok 类目请求超时，请稍后重试或改用 AI 分析',
   });
 
   const data = await response.json();
@@ -69,15 +74,19 @@ export async function fetchRecommendedCategory(
 
 export async function analyzeCategoryWithAI(
   productTitle: string,
-  region: string
+  region: string,
+  signal?: AbortSignal
 ): Promise<AICategoryFetchResponse> {
-  const response = await fetch('/api/tiktok-category-ai', {
+  const response = await fetchWithTimeout('/api/tiktok-category-ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       productTitle,
       region,
     }),
+    signal,
+    timeoutMs: 35_000,
+    timeoutMessage: 'AI 类目分析超时，请稍后重试',
   });
 
   const data = await response.json();
@@ -116,7 +125,8 @@ function pickBestCategory(categories: CategoryRecommendation[]): CategoryRecomme
 
 export async function fetchCategoryForGroup(
   group: ProductGroup,
-  region: string
+  region: string,
+  signal?: AbortSignal
 ): Promise<CategoryLookupResult> {
   const firstRow = group.rows[0];
   const images = [
@@ -130,7 +140,8 @@ export async function fetchCategoryForGroup(
       lookupTitle,
       region,
       undefined,
-      images
+      images,
+      signal
     );
     const bestCategory = pickBestCategory(result.categories);
 
@@ -163,6 +174,9 @@ export async function fetchCategoryForGroup(
       },
     };
   } catch (err) {
+    if (isAbortError(err)) {
+      throw err;
+    }
     const message = err instanceof Error ? err.message : '未知错误';
     return {
       group: {
@@ -180,12 +194,13 @@ export async function fetchCategoryForGroup(
 
 export async function analyzeCategoryForGroupWithAI(
   group: ProductGroup,
-  region: string
+  region: string,
+  signal?: AbortSignal
 ): Promise<AICategoryLookupResult> {
   const lookupTitle = group.productTitle || group.chineseName;
 
   try {
-    const result = await analyzeCategoryWithAI(lookupTitle, region);
+    const result = await analyzeCategoryWithAI(lookupTitle, region, signal);
     if (result.candidates.length === 0) {
       return {
         group: {
@@ -207,6 +222,9 @@ export async function analyzeCategoryForGroupWithAI(
       },
     };
   } catch (err) {
+    if (isAbortError(err)) {
+      throw err;
+    }
     const message = err instanceof Error ? err.message : 'AI 类目分析失败';
     return {
       group: {
@@ -243,7 +261,15 @@ export async function batchFetchCategories(
     const group = updated[i];
     onProgress(i, updated.length, group.erpId);
 
-    const result = await fetchCategoryForGroup(group, region);
+    let result: CategoryLookupResult;
+    try {
+      result = await fetchCategoryForGroup(group, region, signal);
+    } catch (err) {
+      if (isAbortError(err)) {
+        break;
+      }
+      throw err;
+    }
     updated[i] = result.group;
     onGroupUpdate?.(result.group);
 
@@ -283,7 +309,15 @@ export async function batchAnalyzeCategoriesWithAI(
     const group = updated[i];
     onProgress(i, updated.length, group.erpId);
 
-    const result = await analyzeCategoryForGroupWithAI(group, region);
+    let result: AICategoryLookupResult;
+    try {
+      result = await analyzeCategoryForGroupWithAI(group, region, signal);
+    } catch (err) {
+      if (isAbortError(err)) {
+        break;
+      }
+      throw err;
+    }
     updated[i] = result.group;
     onGroupUpdate?.(result.group);
 

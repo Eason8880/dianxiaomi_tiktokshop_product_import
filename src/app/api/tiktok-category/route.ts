@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { translateCategoryPaths } from '@/lib/category-translation';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { getAccessToken } from '@/lib/tiktok-token';
 import { generateCategoryTitleVariants } from '@/lib/category-title-variants';
 import {
@@ -55,13 +56,15 @@ async function requestRecommendedCategories(
   }).toString();
 
   const apiUrl = `https://open-api.tiktokglobalshop.com${apiPath}?${queryString}`;
-  const response = await fetch(apiUrl, {
+  const response = await fetchWithTimeout(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-tts-access-token': accessToken,
     },
     body: bodyString,
+    timeoutMs: 15_000,
+    timeoutMessage: `TikTok 推荐类目请求超时：${productTitle}`,
   });
 
   return response.json();
