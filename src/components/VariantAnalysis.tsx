@@ -21,21 +21,14 @@ function mergeGroupsByErpId(current: ProductGroup[], next: ProductGroup[]): Prod
   return current.map((g) => nextMap.get(g.erpId) || g);
 }
 
-/** 检测 规格1（颜色）值是否包含组合属性（如 "黑色-XS"、"Elevated/Gold"、"升级款--金色"） */
-function hasCompoundColorValues(group: ProductGroup): boolean {
-  return group.rows.some((r) => /[-–/]/.test(String(r['规格1（颜色）'] || '').trim()));
-}
-
 function classifyGroup(group: ProductGroup): ProductMode {
-  // 有 规格2（尺寸） → 已经是二维，无需分析
-  if (group.hasSizeVariant) return 'has_规格';
-  // 有 规格1（颜色） 但值是组合属性（如 "黑色-XS"） → 需要 AI 拆分
-  if (group.hasColorVariant && hasCompoundColorValues(group)) return 'has_attrs';
-  // 有 规格1（颜色） 且值是纯单维 → 无需分析
-  if (group.hasColorVariant) return 'has_规格';
-  // 只有 产品属性 → 需要 AI 分析
-  const hasAttrs = group.rows.some((r) => String(r['产品属性'] || '').trim() !== '');
-  if (hasAttrs) return 'has_attrs';
+  // 规格1 和 规格2 都有值 → 已是标准二维，无需分析
+  if (group.hasColorVariant && group.hasSizeVariant) return 'has_规格';
+  // 有 规格1（颜色）但无 规格2（尺寸），或只有 产品属性
+  // → 交给 AI 语义判断是 1 维还是 2 维，不依赖分隔符检测
+  if (group.hasColorVariant || group.rows.some((r) => String(r['产品属性'] || '').trim() !== '')) {
+    return 'has_attrs';
+  }
   return 'no_variants';
 }
 
