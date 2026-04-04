@@ -87,6 +87,7 @@ function applyResults(prev: ProductGroup[], results: SingleResult[]): ProductGro
     return {
       ...g,
       variantAnalysisStatus: 'done' as const,
+      variantAnalysisSkipped: false,
       variantAnalysisError: undefined,
       variantDimCount: r.dimensions,
       variantDim1: dim1,
@@ -109,7 +110,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
   useEffect(() => {
     if (hasAutoTriggered.current) return;
     const needsAnalysis = groups.some(
-      (g) => classifyGroup(g) === 'has_attrs' && !g.variantAnalysisStatus
+      (g) => classifyGroup(g) === 'has_attrs' && !g.variantAnalysisStatus && !g.variantAnalysisSkipped
     );
     if (needsAnalysis) {
       hasAutoTriggered.current = true;
@@ -141,7 +142,10 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
 
   async function handleAnalyzeAll() {
     const toAnalyze = groups.filter(
-      (g) => classifyGroup(g) === 'has_attrs' && g.variantAnalysisStatus !== 'done'
+      (g) =>
+        classifyGroup(g) === 'has_attrs' &&
+        g.variantAnalysisStatus !== 'done' &&
+        !g.variantAnalysisSkipped
     );
     if (!toAnalyze.length) return;
 
@@ -161,7 +165,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
         onGroupsUpdate((prev) =>
           prev.map((g) =>
             chunk.some((c) => c.erpId === g.erpId)
-              ? { ...g, variantAnalysisStatus: 'pending' }
+              ? { ...g, variantAnalysisStatus: 'pending', variantAnalysisSkipped: false, variantAnalysisError: undefined }
               : g
           )
         );
@@ -197,7 +201,11 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
     setError(null);
     setSingleAnalyzingIds((prev) => [...prev, erpId]);
     onGroupsUpdate((prev) =>
-      prev.map((g) => (g.erpId === erpId ? { ...g, variantAnalysisStatus: 'pending' } : g))
+      prev.map((g) =>
+        g.erpId === erpId
+          ? { ...g, variantAnalysisStatus: 'pending', variantAnalysisSkipped: false, variantAnalysisError: undefined }
+          : g
+      )
     );
 
     try {
@@ -231,6 +239,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
           ? {
               ...g,
               variantAnalysisStatus: undefined,
+              variantAnalysisSkipped: true,
               variantAnalysisError: undefined,
               variantDimCount: undefined,
               variantDim1: undefined,
@@ -266,7 +275,9 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
 
   // Stats
   const needsAnalysis = groups.filter((g) => classifyGroup(g) === 'has_attrs');
-  const doneCount = needsAnalysis.filter((g) => g.variantAnalysisStatus === 'done').length;
+  const actionableAnalysis = needsAnalysis.filter((g) => !g.variantAnalysisSkipped);
+  const doneCount = actionableAnalysis.filter((g) => g.variantAnalysisStatus === 'done').length;
+  const skippedCount = needsAnalysis.filter((g) => g.variantAnalysisSkipped).length;
   const hasReguCount = groups.filter((g) => classifyGroup(g) === 'has_规格').length;
   const noVariantCount = groups.filter((g) => classifyGroup(g) === 'no_variants').length;
 
@@ -291,7 +302,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
       <div className="flex items-center gap-3 flex-wrap">
         <Button
           onClick={handleAnalyzeAll}
-          disabled={isAnalyzing || needsAnalysis.length === doneCount}
+          disabled={isAnalyzing || actionableAnalysis.length === 0 || actionableAnalysis.length === doneCount}
           className="gap-2"
         >
           {isAnalyzing ? (
@@ -309,7 +320,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
           </Button>
         )}
         <span className="text-sm text-muted-foreground ml-auto">
-          待分析 {needsAnalysis.length - doneCount} · 已完成 {doneCount} · 已有规格列 {hasReguCount} · 无变种 {noVariantCount}
+          待分析 {actionableAnalysis.length - doneCount} · 已完成 {doneCount} · 已重置 {skippedCount} · 已有规格列 {hasReguCount} · 无变种 {noVariantCount}
         </span>
       </div>
 
@@ -329,9 +340,9 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
       )}
 
       {needsAnalysis.length > 0 && (
-        <Alert>
-          <AlertDescription>
-            此步骤通过 AI 分析「产品属性」字段，将组合变种（如"黑色-XS"）拆分为独立维度（颜色、尺寸等），供导出时填入变种属性列。
+          <Alert>
+            <AlertDescription>
+            此步骤通过 AI 分析「产品属性」字段，将组合变种（如「黑色-XS」）拆分为独立维度（颜色、尺寸等），供导出时填入变种属性列。
             已有「规格1/规格2」数据的商品无需分析，会直接使用原有数据。
           </AlertDescription>
         </Alert>
@@ -488,7 +499,11 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                                   onClick={() =>
                                     setExpandedIds((prev) => {
                                       const next = new Set(prev);
-                                      isExpanded ? next.delete(group.erpId) : next.add(group.erpId);
+                                      if (isExpanded) {
+                                        next.delete(group.erpId);
+                                      } else {
+                                        next.add(group.erpId);
+                                      }
                                       return next;
                                     })
                                   }
@@ -504,8 +519,14 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                     {mode === 'has_attrs' && group.variantAnalysisStatus === 'error' && (
                       <p className="text-xs text-destructive">{group.variantAnalysisError}</p>
                     )}
+                    {mode === 'has_attrs' && group.variantAnalysisSkipped && !group.variantAnalysisStatus && (
+                      <span className="text-xs text-muted-foreground/60">
+                        已重置，已跳过自动分析
+                      </span>
+                    )}
                     {mode === 'has_attrs' &&
-                      (!group.variantAnalysisStatus || group.variantAnalysisStatus === 'pending') && (
+                      (!group.variantAnalysisStatus || group.variantAnalysisStatus === 'pending') &&
+                      !group.variantAnalysisSkipped && (
                         <span className="text-xs text-muted-foreground/60">
                           {group.variantAnalysisStatus === 'pending' ? '分析中…' : '待分析'}
                         </span>
@@ -541,6 +562,11 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                             <div className="w-3 h-3 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
                             分析中
                           </div>
+                        )}
+                        {group.variantAnalysisSkipped && !group.variantAnalysisStatus && (
+                          <Badge variant="outline" className="text-muted-foreground/70 border-border text-xs">
+                            已重置
+                          </Badge>
                         )}
                         <Button
                           variant="outline"

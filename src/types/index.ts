@@ -42,6 +42,7 @@ export interface ProductGroup {
   hasColorVariant: boolean;
   hasSizeVariant: boolean;
   variantAnalysisStatus?: 'pending' | 'done' | 'error';
+  variantAnalysisSkipped?: boolean;
   variantAnalysisError?: string;
   variantDimCount?: 1 | 2;
   variantDim1?: VariantDimension;
