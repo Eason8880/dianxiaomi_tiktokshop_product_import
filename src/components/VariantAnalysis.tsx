@@ -21,9 +21,9 @@ function mergeGroupsByErpId(current: ProductGroup[], next: ProductGroup[]): Prod
   return current.map((g) => nextMap.get(g.erpId) || g);
 }
 
-/** 检测 规格1（颜色）值是否包含组合属性（如 "黑色-XS"、"Green-1.2M"） */
+/** 检测 规格1（颜色）值是否包含组合属性（如 "黑色-XS"、"Elevated/Gold"、"升级款--金色"） */
 function hasCompoundColorValues(group: ProductGroup): boolean {
-  return group.rows.some((r) => /[-–]/.test(String(r['规格1（颜色）'] || '').trim()));
+  return group.rows.some((r) => /[-–/]/.test(String(r['规格1（颜色）'] || '').trim()));
 }
 
 function classifyGroup(group: ProductGroup): ProductMode {

@@ -87,14 +87,15 @@ Analyze variant attribute strings, determine their dimension structure, and tran
 Rules:
 1. Dimension names must be in English: Color, Size, Length, Weight, Style, Material, Pattern, etc.
 2. If all attributes represent a single concept (e.g. colors only, styles only), output dimensions=1.
-3. If attributes combine two concepts (e.g. "黑色-XS" = Color + Size, "绿-1.2米" = Color + Length), output dimensions=2.
-4. The splits map must include every attribute string from the input, exactly as provided as keys.
-5. For dimensions=1 each splits entry has exactly one element: the English translation of the value.
-6. For dimensions=2 each splits entry has exactly two elements: [English_dim1_value, English_dim2_value].
-7. ALL split values must be in English. Translate Chinese color/size/style names to standard English (e.g. 黑色→Black, 红色→Red, 蓝色→Blue, 绿色→Green, 粉色→Pink, 白色→White, 灰色→Gray, 黄色→Yellow, 紫色→Purple, 橙色→Orange, 咖啡色→Coffee, 藏青→Navy Blue).
-8. For sizes keep standard abbreviations: XS, S, M, L, XL, XXL. For lengths keep numeric+unit (e.g. "1.2M", "1.5M").
-9. Be consistent: the same Chinese sub-string must always map to the same English value across a product.
-10. Return only valid JSON, no markdown, no explanation.`,
+3. If attributes combine two concepts separated by "-", "--", "/" or similar (e.g. "黑色-XS", "Elevated/Gold", "升级款--金色"), output dimensions=2.
+4. Attribute strings may contain the product name as a prefix (e.g. "升级加高款不锈钢纺车轮展示架--金色款"). Extract only the variant-relevant parts, ignoring the product name prefix.
+5. The splits map must include every attribute string from the input, exactly as provided as keys.
+6. For dimensions=1 each splits entry has exactly one element: the English translation of the variant value.
+7. For dimensions=2 each splits entry has exactly two elements: [English_dim1_value, English_dim2_value].
+8. ALL split values must be in English. Translate Chinese names to standard English (e.g. 黑色→Black, 红色→Red, 蓝色→Blue, 绿色→Green, 粉色→Pink, 白色→White, 灰色→Gray, 黄色→Yellow, 紫色→Purple, 橙色→Orange, 咖啡色→Coffee Brown, 藏青→Navy Blue, 金色→Gold, 银色→Silver, 升级加高款→Elevated, 普通款→Regular).
+9. For sizes keep standard abbreviations: XS, S, M, L, XL, XXL. For lengths keep numeric+unit (e.g. "1.2M", "1.5M").
+10. Be consistent: the same sub-string must always map to the same English value across a product.
+11. Return only valid JSON, no markdown, no explanation.`,
         },
         {
           role: 'user',
@@ -127,6 +128,24 @@ Example output for reference (note: all split values must be in English):
       "dim1_name": "Color",
       "dim2_name": "Length",
       "splits": {"绿-1.2米枪柄": ["Green","1.2M"], "蓝-1.5米枪柄": ["Blue","1.5M"]}
+    },
+    {
+      "erpId": "004",
+      "dimensions": 2,
+      "dim1_name": "Style",
+      "dim2_name": "Color",
+      "splits": {
+        "升级加高款不锈钢纺车轮展示架--金色款": ["Elevated","Gold"],
+        "升级加高款不锈钢纺车轮展示架--银色": ["Elevated","Silver"],
+        "普通款不锈钢纺车轮展示架--银色": ["Regular","Silver"]
+      }
+    },
+    {
+      "erpId": "005",
+      "dimensions": 2,
+      "dim1_name": "Style",
+      "dim2_name": "Color",
+      "splits": {"Elevated/Gold": ["Elevated","Gold"], "Elevated/Silver": ["Elevated","Silver"], "Regular/Silver": ["Regular","Silver"]}
     }
   ]
 }
