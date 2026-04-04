@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SourceRow } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { getGroupedStickyToneClass, getGroupedTableToneClass } from '@/lib/table-contrast';
 
 interface DataPreviewProps {
   headers: string[];
@@ -60,17 +61,20 @@ export function DataPreview({ headers, rows }: DataPreviewProps) {
           </thead>
           <tbody>
             {pageRows.map((row, idx) => {
+              const globalIdx = page * PAGE_SIZE + idx;
               const erpId = String(row['ERP ID'] || '');
-              const isEven = erpColorMap.get(erpId);
+              const prevErpId = globalIdx > 0 ? String(rows[globalIdx - 1]?.['ERP ID'] || '') : '';
+              const useAltTone = erpColorMap.get(erpId) ?? false;
+              const rowToneClass = getGroupedTableToneClass(useAltTone);
+              const stickyToneClass = getGroupedStickyToneClass(useAltTone);
+              const isGroupStart = globalIdx > 0 && prevErpId !== erpId;
               return (
                 <tr
                   key={idx}
-                  className={`border-b last:border-0 hover:bg-primary/5 transition-colors ${
-                    isEven ? 'bg-transparent' : 'bg-muted/20'
-                  }`}
+                  className={`border-b last:border-0 border-border transition-colors ${rowToneClass} ${isGroupStart ? 'table-group-divider' : ''}`}
                 >
-                  <td className={`px-3 py-2 text-muted-foreground sticky left-0 z-10 ${isEven ? 'bg-background' : 'bg-muted/20'}`}>
-                    {page * PAGE_SIZE + idx + 1}
+                  <td className={`px-3 py-2 text-muted-foreground sticky left-0 z-10 ${stickyToneClass}`}>
+                    {globalIdx + 1}
                   </td>
                   {headers.map((h) => {
                     const val = String(row[h] ?? '');
@@ -93,9 +97,9 @@ export function DataPreview({ headers, rows }: DataPreviewProps) {
       </div>
 
       <div className="flex gap-2 text-xs text-muted-foreground">
-        <Badge variant="outline" className="text-muted-foreground">浅色行</Badge>
+        <Badge variant="outline" className="table-legend-contrast-base">浅色行</Badge>
         <span>和</span>
-        <Badge variant="outline" className="bg-muted/20 text-muted-foreground">深色行</Badge>
+        <Badge variant="outline" className="table-legend-contrast-alt">深色行</Badge>
         <span>表示不同产品（按 ERP ID 区分）</span>
       </div>
     </div>

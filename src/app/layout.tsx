@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { getThemeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 const syne = Syne({
@@ -36,9 +37,13 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`${syne.variable} ${dmSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      suppressHydrationWarning
+      data-theme="light"
+      data-theme-preference="system"
+      className={`${syne.variable} ${dmSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getZebraTableToneClass } from '@/lib/table-contrast';
 
 interface CategoryConfigProps {
   groups: ProductGroup[];
@@ -248,8 +249,8 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
             </tr>
           </thead>
           <tbody>
-            {groups.map((group) => (
-              <tr key={group.erpId} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
+            {groups.map((group, idx) => (
+              <tr key={group.erpId} className={`border-b last:border-0 border-border transition-colors ${getZebraTableToneClass(idx)}`}>
                 <td className="px-4 py-2">
                   <p className="text-muted-foreground font-mono text-xs">{group.erpId}</p>
                   <p className="text-foreground text-xs mt-1">{group.chineseName || '未提供中文名'}</p>

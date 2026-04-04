@@ -12,6 +12,7 @@ import { PriceCalculator } from '@/components/PriceCalculator';
 import { VariantAnalysis } from '@/components/VariantAnalysis';
 import { CategoryConfig } from '@/components/CategoryConfig';
 import { ExportPreview } from '@/components/ExportPreview';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -72,6 +73,7 @@ export default function Home() {
             <h1 className="text-sm font-semibold text-foreground font-heading">TikTok Shop 商品上架工具</h1>
             <p className="text-xs text-muted-foreground">店小秘批量上架表格生成器</p>
           </div>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -126,7 +128,7 @@ export default function Home() {
         </div>
 
         {/* Step content */}
-        <Card className="glass border-border/60 shadow-2xl shadow-black/40">
+        <Card className="glass panel-shadow border-border/60">
           <CardHeader className="border-b border-border/50 pb-4">
             <div className="flex items-center gap-3">
               <span className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold flex-shrink-0 glow-coral font-heading">

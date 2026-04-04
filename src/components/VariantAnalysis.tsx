@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getZebraTableToneClass } from '@/lib/table-contrast';
 
 interface VariantAnalysisProps {
   groups: ProductGroup[];
@@ -360,13 +361,13 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
             </tr>
           </thead>
           <tbody>
-            {sortedGroups.map((group) => {
+            {sortedGroups.map((group, idx) => {
               const mode = classifyGroup(group);
               const attrs = dedupAttributes(group);
               const isSingleAnalyzing = singleAnalyzingIds.includes(group.erpId);
 
               return (
-                <tr key={group.erpId} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
+                <tr key={group.erpId} className={`border-b last:border-0 border-border transition-colors ${getZebraTableToneClass(idx)}`}>
                   {/* ERP ID / Name */}
                   <td className="px-4 py-3 align-top">
                     <p className="font-mono text-xs text-muted-foreground">{group.erpId}</p>

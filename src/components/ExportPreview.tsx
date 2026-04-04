@@ -5,8 +5,8 @@ import { TargetRow } from '@/types';
 import { TARGET_COLUMNS, TARGET_COLUMN_DISPLAY, isRequiredColumn } from '@/lib/constants';
 import { exportToXlsx } from '@/lib/export-xlsx';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getZebraStickyToneClass, getZebraTableToneClass } from '@/lib/table-contrast';
 
 interface ExportPreviewProps {
   rows: TargetRow[];
@@ -137,9 +137,11 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
           <tbody>
             {pageRows.map((row, idx) => {
               const globalIdx = page * PAGE_SIZE + idx;
+              const rowToneClass = getZebraTableToneClass(idx);
+              const stickyToneClass = getZebraStickyToneClass(idx);
               return (
-                <tr key={idx} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
-                  <td className="px-3 py-2 text-muted-foreground/50 sticky left-0 bg-card z-10">{globalIdx + 1}</td>
+                <tr key={idx} className={`border-b last:border-0 border-border transition-colors ${rowToneClass}`}>
+                  <td className={`px-3 py-2 text-muted-foreground/50 sticky left-0 z-10 ${stickyToneClass}`}>{globalIdx + 1}</td>
                   {TARGET_COLUMNS.map((col) => {
                     const val = row[col];
                     const isEmpty = val === null || val === undefined || val === '';

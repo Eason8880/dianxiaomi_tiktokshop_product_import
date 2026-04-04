@@ -4,6 +4,7 @@ import { ColumnMapping } from '@/types';
 import { TARGET_COLUMN_DISPLAY, isRequiredColumn } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { getZebraTableToneClass } from '@/lib/table-contrast';
 import {
   Select,
   SelectContent,
@@ -17,14 +18,6 @@ interface ColumnMappingProps {
   sourceHeaders: string[];
   onChange: (mappings: ColumnMapping[]) => void;
 }
-
-const TRANSFORM_LABELS: Record<string, string> = {
-  none: '直接映射',
-  divide1000: '÷1000 (g→kg)',
-  htmlToText: 'HTML→文本',
-  calculated: '定价公式',
-  fixedValue: '固定值',
-};
 
 export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: ColumnMappingProps) {
   function updateMapping(idx: number, patch: Partial<ColumnMapping>) {
@@ -49,7 +42,7 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
             const displayName = TARGET_COLUMN_DISPLAY[mapping.targetColumn] || mapping.targetColumn;
 
             return (
-              <tr key={mapping.targetColumn} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
+              <tr key={mapping.targetColumn} className={`border-b last:border-0 border-border transition-colors ${getZebraTableToneClass(idx)}`}>
                 <td className="px-4 py-2">
                   <span className={`font-medium ${isRequired ? 'text-destructive' : 'text-foreground'}`}>
                     {displayName}

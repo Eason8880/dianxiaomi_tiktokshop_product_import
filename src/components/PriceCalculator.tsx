@@ -1,10 +1,11 @@
 'use client';
 
 import { PriceParams, SourceRow } from '@/types';
-import { calculatePrice, getPriceBreakdown } from '@/lib/price-calculator';
+import { getPriceBreakdown } from '@/lib/price-calculator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getZebraTableToneClass } from '@/lib/table-contrast';
 
 interface PriceCalculatorProps {
   params: PriceParams;
@@ -117,7 +118,7 @@ export function PriceCalculator({ params, sampleRows, onChange }: PriceCalculato
                   {previewRows.map((row, i) => {
                     const b = getPriceBreakdown(row, params);
                     return (
-                      <tr key={i} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                      <tr key={i} className={`border-b last:border-0 border-border transition-colors ${getZebraTableToneClass(i)}`}>
                         <td className="px-3 py-2 text-foreground">{String(row['Seller SKU'] || `#${i + 1}`)}</td>
                         <td className="px-3 py-2 text-right text-muted-foreground">{b.cost.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right text-muted-foreground">{b.weightG}</td>
