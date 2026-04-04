@@ -453,22 +453,35 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                           const entries = Object.entries(group.variantDim1.valueMap);
                           const isExpanded = expandedIds.has(group.erpId);
                           const visible = isExpanded ? entries : entries.slice(0, 3);
+                          const hasEmpty = entries.some(
+                            ([raw, v1]) => !v1 || (!!group.variantDim2 && !group.variantDim2.valueMap[raw])
+                          );
                           return (
                             <div className="text-xs text-gray-500 space-y-0.5">
-                              {visible.map(([raw, v1]) => (
-                                <div key={raw} className="font-mono">
-                                  {raw} →{' '}
-                                  <span className="text-blue-600">{v1}</span>
-                                  {group.variantDim2 && (
-                                    <>
-                                      {' + '}
-                                      <span className="text-amber-600">
-                                        {group.variantDim2.valueMap[raw]}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              ))}
+                              {hasEmpty && (
+                                <p className="text-red-500 font-medium">⚠ 存在空白属性值，请重新分析或手动修正</p>
+                              )}
+                              {visible.map(([raw, v1]) => {
+                                const v2 = group.variantDim2?.valueMap[raw] ?? '';
+                                const v1Empty = !v1;
+                                const v2Empty = !!group.variantDim2 && !v2;
+                                return (
+                                  <div key={raw} className="font-mono">
+                                    {raw} →{' '}
+                                    <span className={v1Empty ? 'bg-red-100 text-red-600 px-1 rounded' : 'text-blue-600'}>
+                                      {v1Empty ? '⚠ 空' : v1}
+                                    </span>
+                                    {group.variantDim2 && (
+                                      <>
+                                        {' + '}
+                                        <span className={v2Empty ? 'bg-red-100 text-red-600 px-1 rounded' : 'text-amber-600'}>
+                                          {v2Empty ? '⚠ 空' : v2}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                );
+                              })}
                               {entries.length > 3 && (
                                 <button
                                   className="text-blue-500 hover:text-blue-700 text-xs mt-0.5"

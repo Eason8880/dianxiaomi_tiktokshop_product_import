@@ -47,7 +47,7 @@ function sanitizeResults(raw: AIResponse, products: ProductInput[]): SingleResul
         if (dims === 2) {
           splits[attr] = [
             typeof parts[0] === 'string' && parts[0] ? parts[0] : attr,
-            typeof parts[1] === 'string' && parts[1] ? parts[1] : '',
+            typeof parts[1] === 'string' && parts[1] ? parts[1] : 'Standard',
           ];
         } else {
           splits[attr] = [typeof parts[0] === 'string' && parts[0] ? parts[0] : attr];
@@ -96,7 +96,8 @@ Rules:
 9. For sizes keep standard abbreviations: XS, S, M, L, XL, XXL. For lengths keep numeric+unit (e.g. "1.2M", "1.5M").
 10. Be consistent: the same sub-string must always map to the same English value across a product.
 11. IMPORTANT – mixed/dual-tone colors: If attribute strings represent two colors joined by "+" (e.g. "橙色+绿色", "粉色+蓝色", "红色+白色"), they describe a single dual-tone color variant. Output dimensions=1, dim1_name="Color", and translate the full combined name preserving "+" (e.g. "橙色+绿色"→"Orange+Green", "粉色+蓝色"→"Pink+Blue"). Do NOT split these into 2 dimensions.
-12. Return only valid JSON, no markdown, no explanation.`,
+12. CRITICAL – no empty values for dimensions=2: Every splits entry in a 2D product MUST have BOTH elements non-empty. If one attribute is a standalone concept that does not clearly map to both dimensions (e.g., a bundle/set SKU while the rest are Color×Material), translate it as best you can for dim1 and use "Standard" for dim2. Example: product has variants ["粉色/TPE+ABS", "天使收纳盒款"] with dimensions=2 Color×Material → splits: {"粉色/TPE+ABS": ["Pink","TPE+ABS"], "天使收纳盒款": ["Angel Storage Box","Standard"]}.
+13. Return only valid JSON, no markdown, no explanation.`,
         },
         {
           role: 'user',
