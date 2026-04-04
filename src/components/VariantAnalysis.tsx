@@ -230,6 +230,23 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
     setCurrentProduct('');
   }
 
+  function handleReset(erpId: string) {
+    onGroupsUpdate((prev) =>
+      prev.map((g) =>
+        g.erpId === erpId
+          ? {
+              ...g,
+              variantAnalysisStatus: undefined,
+              variantAnalysisError: undefined,
+              variantDimCount: undefined,
+              variantDim1: undefined,
+              variantDim2: undefined,
+            }
+          : g
+      )
+    );
+  }
+
   function updateDimName(erpId: string, dim: 1 | 2, name: string) {
     onGroupsUpdate((prev) =>
       mergeGroupsByErpId(prev, [
@@ -517,6 +534,18 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                               ? '重新分析'
                               : 'AI 分析'}
                         </Button>
+                        {group.variantAnalysisStatus === 'done' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7 text-gray-400 hover:text-red-500"
+                            onClick={() => handleReset(group.erpId)}
+                            disabled={isAnalyzing || isSingleAnalyzing}
+                            title="清除分析结果，回退到原始规格列数据"
+                          >
+                            重置
+                          </Button>
+                        )}
                       </div>
                     )}
                   </td>
