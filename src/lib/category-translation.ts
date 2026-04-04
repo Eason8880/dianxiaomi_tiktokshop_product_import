@@ -98,6 +98,7 @@ async function translateTextsToChinese(texts: string[]): Promise<Map<string, str
 
   try {
     const { content } = await callOpenRouterChat({
+      timeoutMs: 8_000,
       temperature: 0,
       messages: [
         {
@@ -168,6 +169,7 @@ export async function translateCategoryPaths(paths: string[][]): Promise<Map<str
 
   try {
     const { content } = await callOpenRouterChat({
+      timeoutMs: 8_000,
       temperature: 0,
       messages: [
         {
@@ -229,4 +231,17 @@ export async function translateAICategoryCandidates(
       reason: translatedReasons.get(candidate.reason) || candidate.reason,
     };
   });
+}
+
+export async function translateAICategoryReasons(
+  candidates: AICategoryCandidate[]
+): Promise<AICategoryCandidate[]> {
+  if (!candidates.length) return candidates;
+
+  const translatedReasons = await translateTextsToChinese(candidates.map((candidate) => candidate.reason));
+
+  return candidates.map((candidate) => ({
+    ...candidate,
+    reason: translatedReasons.get(candidate.reason) || candidate.reason,
+  }));
 }

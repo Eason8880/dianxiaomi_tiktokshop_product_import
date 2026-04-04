@@ -45,7 +45,7 @@ function tokenize(value: string): string[] {
     .filter((token) => token.length > 1 && !TITLE_STOPWORDS.has(token));
 }
 
-function shortlistLeafCategories(title: string, leaves: TikTokLeafCategory[], limit = 120): TikTokLeafCategory[] {
+function shortlistLeafCategories(title: string, leaves: TikTokLeafCategory[], limit = 80): TikTokLeafCategory[] {
   const titleVariants = generateCategoryTitleVariants(title);
   const tokenSet = new Set(titleVariants.flatMap(tokenize));
 
@@ -141,6 +141,7 @@ export async function analyzeCategoryWithOpenRouter(
   const leafMap = new Map(shortlisted.map((leaf) => [leaf.categoryId, leaf]));
 
   const { content, model } = await callOpenRouterChat({
+    timeoutMs: 45_000,
     temperature: 0.1,
     messages: [
       {

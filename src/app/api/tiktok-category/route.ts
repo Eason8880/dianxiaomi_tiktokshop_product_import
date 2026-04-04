@@ -5,6 +5,7 @@ import { getAccessToken } from '@/lib/tiktok-token';
 import { generateCategoryTitleVariants } from '@/lib/category-title-variants';
 import {
   fetchCategoryPathMap,
+  fetchLocalizedCategoryPathMap,
   generateTikTokSignature,
   TikTokCategory,
 } from '@/lib/tiktok-category-tree';
@@ -22,6 +23,14 @@ interface TikTokApiResponse {
     categories?: TikTokCategory[];
     category_list?: TikTokCategory[];
   };
+}
+
+function hasChineseText(value: string): boolean {
+  return /[\u3400-\u9fff]/.test(value);
+}
+
+function isLocalizedPath(path: string[]): boolean {
+  return path.some((segment) => hasChineseText(segment));
 }
 
 async function requestRecommendedCategories(
@@ -178,13 +187,22 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const translatedPathMap = await translateCategoryPaths(
-      categoriesWithEnglishPath.map((category) => category.categoryPath)
-    );
+    const localizedPathMap = await fetchLocalizedCategoryPathMap(appKey, appSecret, shopCipher, accessToken);
+    const fallbackPaths = categoriesWithEnglishPath
+      .map((category) => localizedPathMap.get(String(category.id || '')) || category.categoryPath)
+      .filter((path) => path.length > 0 && !isLocalizedPath(path));
+    const translatedPathMap = fallbackPaths.length > 0
+      ? await translateCategoryPaths(fallbackPaths)
+      : new Map<string, string[]>();
 
     const categories = categoriesWithEnglishPath.map((category) => {
       const englishPath = category.categoryPath;
-      const translatedPath = translatedPathMap.get(englishPath.join(' > ')) || englishPath;
+      const localizedPath = localizedPathMap.get(String(category.id || '')) || [];
+      const displayPathBase = localizedPath.length > 0 ? localizedPath : englishPath;
+      const translatedPath =
+        isLocalizedPath(displayPathBase)
+          ? displayPathBase
+          : translatedPathMap.get(displayPathBase.join(' > ')) || displayPathBase;
 
       return {
         ...category,

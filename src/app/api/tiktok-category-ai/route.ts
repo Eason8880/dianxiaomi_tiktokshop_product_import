@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { translateAICategoryCandidates } from '@/lib/category-translation';
+import { translateAICategoryReasons } from '@/lib/category-translation';
 import { getAccessToken } from '@/lib/tiktok-token';
-import { fetchLeafCategories } from '@/lib/tiktok-category-tree';
+import { fetchLeafCategories, fetchLocalizedCategoryPathMap } from '@/lib/tiktok-category-tree';
 import { analyzeCategoryWithOpenRouter } from '@/lib/openrouter-category-match';
 
 interface AICategoryRequest {
@@ -68,8 +68,13 @@ export async function POST(request: NextRequest) {
 
     const accessToken = await getAccessToken();
     const leafCategories = await fetchLeafCategories(appKey, appSecret, shopCipher, accessToken);
+    const localizedPathMap = await fetchLocalizedCategoryPathMap(appKey, appSecret, shopCipher, accessToken);
     const result = await analyzeCategoryWithOpenRouter(analyzedTitle, leafCategories);
-    const translatedCandidates = await translateAICategoryCandidates(result.candidates);
+    const localizedCandidates = result.candidates.map((candidate) => ({
+      ...candidate,
+      categoryPath: localizedPathMap.get(candidate.categoryId) || candidate.categoryPath,
+    }));
+    const translatedCandidates = await translateAICategoryReasons(localizedCandidates);
 
     return NextResponse.json({
       ...result,

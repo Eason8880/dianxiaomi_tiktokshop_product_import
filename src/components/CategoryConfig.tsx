@@ -116,7 +116,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
 
   async function handleAnalyzeAI(erpId: string) {
     const group = groups.find((item) => item.erpId === erpId);
-    if (!group) return;
+    if (!group || analyzingAiErpIds.includes(erpId)) return;
 
     setError(null);
     setAnalyzingAiErpIds((prev) => [...prev, erpId]);
@@ -286,7 +286,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                         variant="outline"
                         size="sm"
                         onClick={() => handleAnalyzeAI(group.erpId)}
-                        disabled={isFetching || hasActiveSingleRetry}
+                        disabled={isFetching || isAnalyzingAI(group.erpId)}
                       >
                         {isAnalyzingAI(group.erpId)
                           ? 'AI 分析中…'
@@ -313,7 +313,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                               variant="outline"
                               size="sm"
                               onClick={() => applyAICandidate(group.erpId, candidate)}
-                              disabled={isFetching || hasActiveSingleRetry}
+                              disabled={isFetching}
                             >
                               应用
                             </Button>
@@ -330,7 +330,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                     placeholder="输入分类 ID…"
                     value={group.recommendedCategoryId || ''}
                     onChange={(e) => updateCategory(group.erpId, e.target.value)}
-                    disabled={isFetching || hasActiveSingleRetry}
+                    disabled={isFetching}
                   />
                 </td>
                 <td className="px-4 py-2">

@@ -10,6 +10,7 @@ interface OpenRouterChatOptions {
   model?: string;
   temperature?: number;
   responseFormat?: { type: 'json_object' } | null;
+  timeoutMs?: number;
 }
 
 export const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -32,6 +33,7 @@ export async function callOpenRouterChat({
   model,
   temperature = 0.1,
   responseFormat = { type: 'json_object' },
+  timeoutMs = 30_000,
 }: OpenRouterChatOptions): Promise<{ content: string; model: string }> {
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
@@ -52,7 +54,7 @@ export async function callOpenRouterChat({
         ...(responseFormat ? { response_format: responseFormat } : {}),
         messages,
       }),
-      timeoutMs: 30_000,
+      timeoutMs,
       timeoutMessage: 'OpenRouter 请求超时，请稍后重试',
     }
   );

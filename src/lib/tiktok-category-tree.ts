@@ -54,7 +54,8 @@ async function fetchRawCategoryTree(
   appKey: string,
   appSecret: string,
   shopCipher: string,
-  accessToken: string
+  accessToken: string,
+  locale?: string
 ): Promise<TikTokCategory[]> {
   const apiPath = '/product/202309/categories';
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -63,8 +64,10 @@ async function fetchRawCategoryTree(
     app_key: appKey,
     shop_cipher: shopCipher,
     timestamp,
-    locale: 'en',
   };
+  if (locale) {
+    queryParams.locale = locale;
+  }
 
   const sign = generateTikTokSignature(apiPath, queryParams, '', appSecret);
   const queryString = new URLSearchParams({ ...queryParams, sign }).toString();
@@ -92,15 +95,16 @@ async function fetchCategoryTreeCacheEntry(
   appKey: string,
   appSecret: string,
   shopCipher: string,
-  accessToken: string
+  accessToken: string,
+  locale?: string
 ): Promise<CategoryTreeCacheEntry> {
-  const cacheKey = `${shopCipher}:en`;
+  const cacheKey = `${shopCipher}:${locale || 'default'}`;
   const cached = categoryTreeCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CATEGORY_TREE_TTL_MS) {
     return cached;
   }
 
-  const categories = await fetchRawCategoryTree(appKey, appSecret, shopCipher, accessToken);
+  const categories = await fetchRawCategoryTree(appKey, appSecret, shopCipher, accessToken, locale);
   const catMap = new Map<string, TikTokCategory>();
   for (const cat of categories) {
     catMap.set(String(cat.id), cat);
@@ -153,6 +157,15 @@ export async function fetchCategoryPathMap(
   shopCipher: string,
   accessToken: string
 ): Promise<Map<string, string[]>> {
+  return (await fetchCategoryTreeCacheEntry(appKey, appSecret, shopCipher, accessToken, 'en')).pathMap;
+}
+
+export async function fetchLocalizedCategoryPathMap(
+  appKey: string,
+  appSecret: string,
+  shopCipher: string,
+  accessToken: string
+): Promise<Map<string, string[]>> {
   return (await fetchCategoryTreeCacheEntry(appKey, appSecret, shopCipher, accessToken)).pathMap;
 }
 
@@ -162,5 +175,5 @@ export async function fetchLeafCategories(
   shopCipher: string,
   accessToken: string
 ): Promise<TikTokLeafCategory[]> {
-  return (await fetchCategoryTreeCacheEntry(appKey, appSecret, shopCipher, accessToken)).leafCategories;
+  return (await fetchCategoryTreeCacheEntry(appKey, appSecret, shopCipher, accessToken, 'en')).leafCategories;
 }
