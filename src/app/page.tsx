@@ -146,7 +146,16 @@ export default function Home() {
                         <Label className="text-sm font-medium text-red-600">* 仓库名称（必填）</Label>
                         <Input
                           value={warehouseName}
-                          onChange={(e) => setWarehouseName(e.target.value)}
+                          onChange={(e) => {
+                            setWarehouseName(e.target.value);
+                            setMappings((prev) =>
+                              prev.map((m) =>
+                                m.targetColumn === '*仓库名称\n（必填）'
+                                  ? { ...m, fixedValue: e.target.value }
+                                  : m
+                              )
+                            );
+                          }}
                           placeholder="填写店小秘中配置的仓库名称"
                         />
                       </div>

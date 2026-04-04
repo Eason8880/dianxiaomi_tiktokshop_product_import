@@ -88,15 +88,15 @@ export function applyMappings(
         continue;
       }
 
-      // AI-analyzed variant values: look up 产品属性 → dim value
+      // AI-analyzed variant values: look up 产品属性 → dim value (fallback: 规格1（颜色）)
       if (targetColumn === '变种属性值一' && group?.variantDim1) {
-        const key = String(sourceRow['产品属性'] || '').trim();
+        const key = String(sourceRow['产品属性'] || sourceRow['规格1（颜色）'] || '').trim();
         value = group.variantDim1.valueMap[key] ?? '';
         targetRow[targetColumn] = value;
         continue;
       }
       if (targetColumn === '变种属性值二' && group?.variantDim2) {
-        const key = String(sourceRow['产品属性'] || '').trim();
+        const key = String(sourceRow['产品属性'] || sourceRow['规格1（颜色）'] || '').trim();
         value = group.variantDim2.valueMap[key] ?? '';
         targetRow[targetColumn] = value;
         continue;

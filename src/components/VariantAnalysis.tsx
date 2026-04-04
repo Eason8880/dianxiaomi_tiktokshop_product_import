@@ -21,21 +21,39 @@ function mergeGroupsByErpId(current: ProductGroup[], next: ProductGroup[]): Prod
   return current.map((g) => nextMap.get(g.erpId) || g);
 }
 
+/** 检测 规格1（颜色）值是否包含组合属性（如 "黑色-XS"、"Green-1.2M"） */
+function hasCompoundColorValues(group: ProductGroup): boolean {
+  return group.rows.some((r) => /[-–]/.test(String(r['规格1（颜色）'] || '').trim()));
+}
+
 function classifyGroup(group: ProductGroup): ProductMode {
-  if (group.hasColorVariant || group.hasSizeVariant) return 'has_规格';
+  // 有 规格2（尺寸） → 已经是二维，无需分析
+  if (group.hasSizeVariant) return 'has_规格';
+  // 有 规格1（颜色） 但值是组合属性（如 "黑色-XS"） → 需要 AI 拆分
+  if (group.hasColorVariant && hasCompoundColorValues(group)) return 'has_attrs';
+  // 有 规格1（颜色） 且值是纯单维 → 无需分析
+  if (group.hasColorVariant) return 'has_规格';
+  // 只有 产品属性 → 需要 AI 分析
   const hasAttrs = group.rows.some((r) => String(r['产品属性'] || '').trim() !== '');
   if (hasAttrs) return 'has_attrs';
   return 'no_variants';
 }
 
+/** 取待分析的属性列表：优先 产品属性，备用 规格1（颜色） */
 function dedupAttributes(group: ProductGroup): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
+
+  // 先从 产品属性 取
   for (const r of group.rows) {
     const v = String(r['产品属性'] || '').trim();
-    if (v && !seen.has(v)) {
-      seen.add(v);
-      result.push(v);
+    if (v && !seen.has(v)) { seen.add(v); result.push(v); }
+  }
+  // 若 产品属性 全空，回退到 规格1（颜色）
+  if (result.length === 0) {
+    for (const r of group.rows) {
+      const v = String(r['规格1（颜色）'] || '').trim();
+      if (v && !seen.has(v)) { seen.add(v); result.push(v); }
     }
   }
   return result;
