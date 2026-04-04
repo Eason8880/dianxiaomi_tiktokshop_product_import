@@ -95,7 +95,8 @@ Rules:
 8. ALL split values must be in English. Translate Chinese names to standard English (e.g. 黑色→Black, 红色→Red, 蓝色→Blue, 绿色→Green, 粉色→Pink, 白色→White, 灰色→Gray, 黄色→Yellow, 紫色→Purple, 橙色→Orange, 咖啡色→Coffee Brown, 藏青→Navy Blue, 金色→Gold, 银色→Silver, 升级加高款→Elevated, 普通款→Regular).
 9. For sizes keep standard abbreviations: XS, S, M, L, XL, XXL. For lengths keep numeric+unit (e.g. "1.2M", "1.5M").
 10. Be consistent: the same sub-string must always map to the same English value across a product.
-11. Return only valid JSON, no markdown, no explanation.`,
+11. IMPORTANT – mixed/dual-tone colors: If attribute strings represent two colors joined by "+" (e.g. "橙色+绿色", "粉色+蓝色", "红色+白色"), they describe a single dual-tone color variant. Output dimensions=1, dim1_name="Color", and translate the full combined name preserving "+" (e.g. "橙色+绿色"→"Orange+Green", "粉色+蓝色"→"Pink+Blue"). Do NOT split these into 2 dimensions.
+12. Return only valid JSON, no markdown, no explanation.`,
         },
         {
           role: 'user',

@@ -101,6 +101,7 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
   const [currentProduct, setCurrentProduct] = useState('');
   const [singleAnalyzingIds, setSingleAnalyzingIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
   const hasAutoTriggered = useRef(false);
 
@@ -447,12 +448,14 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                         <p className="text-xs text-gray-400">
                           {group.variantDimCount === 2 ? '2 个维度' : '1 个维度'} · {attrs.length} 个变种
                         </p>
-                        {/* Show a few example splits */}
-                        {group.variantDim1 && (
-                          <div className="text-xs text-gray-500 space-y-0.5">
-                            {Object.entries(group.variantDim1.valueMap)
-                              .slice(0, 3)
-                              .map(([raw, v1]) => (
+                        {/* Splits list with expand/collapse */}
+                        {group.variantDim1 && (() => {
+                          const entries = Object.entries(group.variantDim1.valueMap);
+                          const isExpanded = expandedIds.has(group.erpId);
+                          const visible = isExpanded ? entries : entries.slice(0, 3);
+                          return (
+                            <div className="text-xs text-gray-500 space-y-0.5">
+                              {visible.map(([raw, v1]) => (
                                 <div key={raw} className="font-mono">
                                   {raw} →{' '}
                                   <span className="text-blue-600">{v1}</span>
@@ -466,11 +469,23 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
                                   )}
                                 </div>
                               ))}
-                            {attrs.length > 3 && (
-                              <p className="text-gray-400">…共 {attrs.length} 条</p>
-                            )}
-                          </div>
-                        )}
+                              {entries.length > 3 && (
+                                <button
+                                  className="text-blue-500 hover:text-blue-700 text-xs mt-0.5"
+                                  onClick={() =>
+                                    setExpandedIds((prev) => {
+                                      const next = new Set(prev);
+                                      isExpanded ? next.delete(group.erpId) : next.add(group.erpId);
+                                      return next;
+                                    })
+                                  }
+                                >
+                                  {isExpanded ? '收起' : `展开全部（共 ${entries.length} 条）`}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     {mode === 'has_attrs' && group.variantAnalysisStatus === 'error' && (
