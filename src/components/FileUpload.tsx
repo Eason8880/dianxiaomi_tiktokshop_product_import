@@ -71,10 +71,10 @@ export function FileUpload({ onDataParsed }: FileUploadProps) {
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+        className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 ${
           isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+            ? 'border-primary bg-primary/8 glow-coral scale-[1.005]'
+            : 'border-border hover:border-primary/50 hover:bg-muted/30'
         }`}
         onClick={() => document.getElementById('file-input')?.click()}
       >
@@ -87,20 +87,20 @@ export function FileUpload({ onDataParsed }: FileUploadProps) {
         />
         {loading ? (
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-500">正在解析文件…</p>
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-muted-foreground">正在解析文件…</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
-            <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-12 h-12 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <div>
-              <p className="text-base font-medium text-gray-700">
+              <p className="text-base font-medium text-foreground">
                 拖拽文件到此处，或点击选择文件
               </p>
-              <p className="text-sm text-gray-400 mt-1">支持 ERP 导出的 .xls 格式</p>
+              <p className="text-sm text-muted-foreground mt-1">支持 ERP 导出的 .xls 格式</p>
             </div>
           </div>
         )}
@@ -109,11 +109,11 @@ export function FileUpload({ onDataParsed }: FileUploadProps) {
       {fileName && !error && (
         <Card>
           <CardContent className="flex items-center gap-3 py-3">
-            <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-[oklch(0.72_0.17_162)] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span className="text-sm font-medium text-gray-700 flex-1">{fileName}</span>
-            <Badge variant="secondary">已解析</Badge>
+            <span className="text-sm font-medium text-foreground flex-1">{fileName}</span>
+            <Badge className="bg-[oklch(0.72_0.17_162)]/20 text-[oklch(0.72_0.17_162)] border border-[oklch(0.72_0.17_162)]/30">已解析</Badge>
           </CardContent>
         </Card>
       )}

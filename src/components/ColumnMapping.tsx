@@ -36,11 +36,11 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-gray-50 border-b">
-            <th className="px-4 py-3 text-left font-medium text-gray-600 w-48">目标列</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600 w-56">源数据列</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600 w-36">转换方式</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">固定值 / 说明</th>
+          <tr className="bg-muted/40 border-b border-border">
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground w-48">目标列</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground w-56">源数据列</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground w-36">转换方式</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground">固定值 / 说明</th>
           </tr>
         </thead>
         <tbody>
@@ -49,15 +49,15 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
             const displayName = TARGET_COLUMN_DISPLAY[mapping.targetColumn] || mapping.targetColumn;
 
             return (
-              <tr key={mapping.targetColumn} className="border-b last:border-0 hover:bg-gray-50">
+              <tr key={mapping.targetColumn} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-2">
-                  <span className={`font-medium ${isRequired ? 'text-red-600' : 'text-gray-700'}`}>
+                  <span className={`font-medium ${isRequired ? 'text-destructive' : 'text-foreground'}`}>
                     {displayName}
                   </span>
                 </td>
                 <td className="px-4 py-2">
                   {mapping.transform === 'calculated' || mapping.transform === 'fixedValue' ? (
-                    <span className="text-gray-400 text-xs italic">—</span>
+                    <span className="text-muted-foreground text-xs italic">—</span>
                   ) : (
                     <Select
                       value={mapping.sourceColumn || '__none__'}
@@ -81,7 +81,7 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
                   {mapping.transform === 'calculated' ? (
                     <Badge variant="secondary" className="text-xs">定价公式</Badge>
                   ) : mapping.transform === 'fixedValue' ? (
-                    <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">固定值</Badge>
+                    <Badge variant="secondary" className="text-xs bg-primary/15 text-primary border border-primary/20">固定值</Badge>
                   ) : (
                     <Select
                       value={mapping.transform}
@@ -110,7 +110,7 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
                       onChange={(e) => updateMapping(idx, { fixedValue: e.target.value })}
                     />
                   ) : mapping.description ? (
-                    <span className="text-xs text-gray-400 italic">{mapping.description}</span>
+                    <span className="text-xs text-muted-foreground italic">{mapping.description}</span>
                   ) : null}
                 </td>
               </tr>

@@ -156,14 +156,14 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
 
   function renderCategorySource(group: ProductGroup) {
     if (group.categorySource === 'tiktok') {
-      return <Badge variant="outline" className="text-blue-600 border-blue-200">TikTok 推荐</Badge>;
+      return <Badge variant="outline" className="text-primary/80 border-primary/30">TikTok 推荐</Badge>;
     }
 
     if (group.categorySource === 'ai') {
-      return <Badge variant="outline" className="text-amber-700 border-amber-200">AI 分析</Badge>;
+      return <Badge variant="outline" className="text-[oklch(0.75_0.15_80)] border-[oklch(0.75_0.15_80)]/30">AI 分析</Badge>;
     }
 
-    return <span className="text-xs text-gray-400">—</span>;
+    return <span className="text-xs text-muted-foreground/60">—</span>;
   }
 
   const filledCount = groups.filter((g) => g.recommendedCategoryId).length;
@@ -199,7 +199,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
         {isFetching && (
           <Button variant="outline" size="sm" onClick={handleStop}>停止</Button>
         )}
-        <span className="text-sm text-gray-500 ml-auto">
+        <span className="text-sm text-muted-foreground ml-auto">
           已填写 {filledCount} / {groups.length} 个产品
         </span>
       </div>
@@ -207,7 +207,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
       {isFetching && (
         <div className="space-y-2">
           <Progress value={progress} className="h-2" />
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted-foreground">
             {currentProduct
               ? `${currentAction === 'ai'
                   ? '正在进行 AI 类目分析'
@@ -238,46 +238,46 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b">
-              <th className="px-4 py-3 text-left font-medium text-gray-600 w-44">ERP ID / 中文名</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">产品名称</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 w-24">变体数</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 w-48">分类 ID（必填）</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 w-28">类目来源</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 w-24">状态</th>
+            <tr className="bg-muted/40 border-b border-border">
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-44">ERP ID / 中文名</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">产品名称</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-24">变体数</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-48">分类 ID（必填）</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-28">类目来源</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-24">状态</th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group) => (
-              <tr key={group.erpId} className="border-b last:border-0 hover:bg-gray-50">
+              <tr key={group.erpId} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-2">
-                  <p className="text-gray-600 font-mono text-xs">{group.erpId}</p>
-                  <p className="text-gray-800 text-xs mt-1">{group.chineseName || '未提供中文名'}</p>
+                  <p className="text-muted-foreground font-mono text-xs">{group.erpId}</p>
+                  <p className="text-foreground text-xs mt-1">{group.chineseName || '未提供中文名'}</p>
                 </td>
                 <td className="px-4 py-2">
-                  <p className="text-gray-800 text-xs truncate max-w-[320px]" title={group.productTitle}>
+                  <p className="text-foreground text-xs truncate max-w-[320px]" title={group.productTitle}>
                     {group.productTitle || group.chineseName || '未提供产品标题'}
                   </p>
                   {group.recommendedCategoryId && group.categoryPath && group.categoryPath.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-0.5 mt-0.5">
                       {group.categoryPath.map((seg, idx) => (
                         <span key={idx} className="flex items-center gap-0.5">
-                          {idx > 0 && <span className="text-gray-300 text-xs">›</span>}
-                          <span className="text-gray-400 text-xs">{seg}</span>
+                          {idx > 0 && <span className="text-muted-foreground/40 text-xs">›</span>}
+                          <span className="text-muted-foreground text-xs">{seg}</span>
                         </span>
                       ))}
                     </div>
                   ) : group.recommendedCategoryId && group.categoryName ? (
-                    <p className="text-gray-400 text-xs mt-0.5">{group.categoryName}</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">{group.categoryName}</p>
                   ) : null}
                   <div className="mt-2 space-y-2">
                     {(group.categoryLookupError || group.aiCategoryError) ? (
                       <div className="space-y-1">
                         {group.categoryLookupError ? (
-                          <p className="text-xs text-red-500">{group.categoryLookupError}</p>
+                          <p className="text-xs text-destructive">{group.categoryLookupError}</p>
                         ) : null}
                         {group.aiCategoryError ? (
-                          <p className="text-xs text-orange-500">{group.aiCategoryError}</p>
+                          <p className="text-xs text-[oklch(0.75_0.15_80)]">{group.aiCategoryError}</p>
                         ) : null}
                       </div>
                     ) : null}
@@ -296,18 +296,18 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                       </Button>
                     ) : null}
                     {group.aiCategoryCandidates && group.aiCategoryCandidates.length > 0 ? (
-                      <div className="space-y-2 rounded-md border border-dashed border-gray-200 bg-gray-50 p-2">
-                        <p className="text-xs font-medium text-gray-600">
+                      <div className="space-y-2 rounded-md border border-dashed border-border/50 bg-muted/30 p-2">
+                        <p className="text-xs font-medium text-muted-foreground">
                           AI 候选类目{group.aiAnalyzedTitle ? `（分析标题：${group.aiAnalyzedTitle}）` : ''}
                         </p>
                         {group.aiCategoryCandidates.map((candidate) => (
                           <div
                             key={`${group.erpId}-${candidate.categoryId}`}
-                            className="flex items-start justify-between gap-3 rounded-md bg-white px-2 py-2"
+                            className="flex items-start justify-between gap-3 rounded-md bg-card/80 border border-border/30 px-2 py-2"
                           >
                             <div className="space-y-1">
-                              <p className="text-xs text-gray-700">{candidate.categoryPath.join(' > ')}</p>
-                              <p className="text-[11px] text-gray-400">{candidate.reason}</p>
+                              <p className="text-xs text-foreground">{candidate.categoryPath.join(' > ')}</p>
+                              <p className="text-[11px] text-muted-foreground">{candidate.reason}</p>
                             </div>
                             <Button
                               variant="outline"
@@ -323,7 +323,7 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                     ) : null}
                   </div>
                 </td>
-                <td className="px-4 py-2 text-center text-gray-500">{group.rows.length}</td>
+                <td className="px-4 py-2 text-center text-muted-foreground">{group.rows.length}</td>
                 <td className="px-4 py-2">
                   <Input
                     className="h-8 text-xs font-mono"
@@ -338,13 +338,13 @@ export function CategoryConfig({ groups, onGroupsUpdate }: CategoryConfigProps) 
                 </td>
                 <td className="px-4 py-2">
                   {group.recommendedCategoryId ? (
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100">已填写</Badge>
+                    <Badge className="bg-[oklch(0.72_0.17_162)]/20 text-[oklch(0.72_0.17_162)] hover:bg-[oklch(0.72_0.17_162)]/20 border border-[oklch(0.72_0.17_162)]/30">已填写</Badge>
                   ) : group.aiCategoryCandidates?.length ? (
-                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">待确认</Badge>
+                    <Badge className="bg-[oklch(0.75_0.15_80)]/15 text-[oklch(0.75_0.15_80)] hover:bg-[oklch(0.75_0.15_80)]/15 border border-[oklch(0.75_0.15_80)]/30">待确认</Badge>
                   ) : group.categoryLookupError || group.aiCategoryError ? (
-                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">待处理</Badge>
+                    <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/15 border border-destructive/30">待处理</Badge>
                   ) : (
-                    <Badge variant="outline" className="text-gray-400">待填写</Badge>
+                    <Badge variant="outline" className="text-muted-foreground/50">待填写</Badge>
                   )}
                 </td>
               </tr>

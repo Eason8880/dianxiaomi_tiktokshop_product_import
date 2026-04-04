@@ -52,14 +52,14 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
     <div className="space-y-4">
       {/* Summary + export button */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-3 text-sm text-gray-500">
-          <span>共 <strong>{rows.length}</strong> 行</span>
+        <div className="flex gap-3 text-sm text-muted-foreground">
+          <span>共 <strong className="text-foreground">{rows.length}</strong> 行</span>
           <span>·</span>
-          <span><strong>{TARGET_COLUMNS.length}</strong> 列</span>
+          <span><strong className="text-foreground">{TARGET_COLUMNS.length}</strong> 列</span>
           {missingRequired.length > 0 && (
             <>
               <span>·</span>
-              <span className="text-amber-600 font-medium">
+              <span className="text-[oklch(0.75_0.15_80)] font-medium">
                 {missingRequired.length} 处必填项为空
               </span>
             </>
@@ -90,8 +90,8 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
       )}
 
       {missingRequired.length > 0 && (
-        <Alert className="border-amber-200 bg-amber-50">
-          <AlertDescription className="text-amber-700 text-xs">
+        <Alert className="border-[oklch(0.75_0.15_80)]/30 bg-[oklch(0.75_0.15_80)]/10">
+          <AlertDescription className="text-[oklch(0.75_0.15_80)] text-xs">
             以下必填项为空，导出文件可能无法直接导入店小秘。分类 ID 可在导出后手动填写。
             <br />
             {[...new Set(missingRequired.map((m) => TARGET_COLUMN_DISPLAY[m.col] || m.col))].join('、')}
@@ -105,7 +105,7 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
           <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
             上一页
           </Button>
-          <span className="text-sm text-gray-500">{page + 1} / {totalPages}</span>
+          <span className="text-sm text-muted-foreground">{page + 1} / {totalPages}</span>
           <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
             下一页
           </Button>
@@ -116,8 +116,8 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
       <div className="overflow-x-auto rounded-lg border">
         <table className="text-xs min-w-max">
           <thead>
-            <tr className="bg-gray-50 border-b">
-              <th className="px-3 py-2 text-left text-gray-400 sticky left-0 bg-gray-50 z-10">#</th>
+            <tr className="bg-muted/40 border-b border-border">
+              <th className="px-3 py-2 text-left text-muted-foreground/50 sticky left-0 bg-muted/40 z-10">#</th>
               {TARGET_COLUMNS.map((col) => {
                 const display = TARGET_COLUMN_DISPLAY[col] || col;
                 const req = isRequiredColumn(col);
@@ -125,7 +125,7 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
                   <th
                     key={col}
                     className={`px-3 py-2 text-left font-medium whitespace-nowrap ${
-                      req ? 'text-red-600' : 'text-gray-600'
+                      req ? 'text-destructive' : 'text-muted-foreground'
                     }`}
                   >
                     {display}
@@ -138,8 +138,8 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
             {pageRows.map((row, idx) => {
               const globalIdx = page * PAGE_SIZE + idx;
               return (
-                <tr key={idx} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400 sticky left-0 bg-white z-10">{globalIdx + 1}</td>
+                <tr key={idx} className="border-b last:border-0 border-border hover:bg-muted/20 transition-colors">
+                  <td className="px-3 py-2 text-muted-foreground/50 sticky left-0 bg-card z-10">{globalIdx + 1}</td>
                   {TARGET_COLUMNS.map((col) => {
                     const val = row[col];
                     const isEmpty = val === null || val === undefined || val === '';
@@ -151,10 +151,10 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
                         key={col}
                         className={`px-3 py-2 max-w-[200px] truncate ${
                           isMissing
-                            ? 'bg-amber-50 text-amber-400'
+                            ? 'bg-[oklch(0.75_0.15_80)]/10 text-[oklch(0.75_0.15_80)]'
                             : isEmpty
-                            ? 'text-gray-300'
-                            : 'text-gray-700'
+                            ? 'text-muted-foreground/20'
+                            : 'text-foreground'
                         }`}
                         title={String(val || '')}
                       >
