@@ -218,8 +218,10 @@ export async function translateAICategoryCandidates(
 ): Promise<AICategoryCandidate[]> {
   if (!candidates.length) return candidates;
 
-  const translatedPaths = await translateCategoryPaths(candidates.map((candidate) => candidate.categoryPath));
-  const translatedReasons = await translateTextsToChinese(candidates.map((candidate) => candidate.reason));
+  const [translatedPaths, translatedReasons] = await Promise.all([
+    translateCategoryPaths(candidates.map((candidate) => candidate.categoryPath)),
+    translateTextsToChinese(candidates.map((candidate) => candidate.reason)),
+  ]);
 
   return candidates.map((candidate) => {
     const translatedPath =
@@ -233,15 +235,3 @@ export async function translateAICategoryCandidates(
   });
 }
 
-export async function translateAICategoryReasons(
-  candidates: AICategoryCandidate[]
-): Promise<AICategoryCandidate[]> {
-  if (!candidates.length) return candidates;
-
-  const translatedReasons = await translateTextsToChinese(candidates.map((candidate) => candidate.reason));
-
-  return candidates.map((candidate) => ({
-    ...candidate,
-    reason: translatedReasons.get(candidate.reason) || candidate.reason,
-  }));
-}

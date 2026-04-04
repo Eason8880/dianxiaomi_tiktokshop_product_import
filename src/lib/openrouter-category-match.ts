@@ -45,7 +45,7 @@ function tokenize(value: string): string[] {
     .filter((token) => token.length > 1 && !TITLE_STOPWORDS.has(token));
 }
 
-function shortlistLeafCategories(title: string, leaves: TikTokLeafCategory[], limit = 80): TikTokLeafCategory[] {
+function shortlistLeafCategories(title: string, leaves: TikTokLeafCategory[], limit = 50): TikTokLeafCategory[] {
   const titleVariants = generateCategoryTitleVariants(title);
   const tokenSet = new Set(titleVariants.flatMap(tokenize));
 

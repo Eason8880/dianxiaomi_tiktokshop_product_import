@@ -85,7 +85,7 @@ export async function analyzeCategoryWithAI(
       region,
     }),
     signal,
-    timeoutMs: 60_000,
+    timeoutMs: 90_000,
     timeoutMessage: 'AI 类目分析超时，请稍后重试',
   });
 
