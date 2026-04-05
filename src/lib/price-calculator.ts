@@ -1,61 +1,126 @@
-import { PriceParams, SourceRow } from '@/types';
+import { ExchangeRatesState, PriceParams, SourceRow } from '@/types';
+import {
+  applyRoundRule,
+  BASE_PROFIT_RATE,
+  getPricingPreset,
+  PACKAGE_HANDLING_FEE_CNY,
+} from '@/lib/pricing-config';
 
-/**
- * Calculate the selling price for a single SKU row.
- *
- * Formula:
- * sellingPrice = ((cost + additionalCost + firstMileShipping + lastMileShipping) × profitMultiplier)
- *                / (1 - platformFeeRate) / exchangeRate
- *
- * Where:
- *   firstMileShipping = weightKg × firstMileRate
- *   lastMileShipping = weightKg × lastMileRate
- */
-export function calculatePrice(
-  row: SourceRow,
-  params: PriceParams
-): number {
-  const cost = Number(row['成本（有差值）']) || 0;
-  const weightG = Number(row['发货重量（有差值）']) || Number(row['商品重量(g)']) || 0;
-  const weightKg = weightG / 1000;
-
-  const firstMileShipping = weightKg * params.firstMileRate;
-  const lastMileShipping = weightKg * params.lastMileRate;
-
-  const baseCost = cost + params.additionalCost + firstMileShipping + lastMileShipping;
-  const withProfit = baseCost * params.profitMultiplier;
-  const withPlatformFee = withProfit / (1 - params.platformFeeRate);
-  const inTargetCurrency = withPlatformFee / params.exchangeRate;
-
-  return Math.round(inTargetCurrency * 100) / 100;
+export interface PriceBreakdown {
+  costCny: number;
+  weightG: number;
+  weightKg: number;
+  packageFeeCny: number;
+  usdToCny: number;
+  usdToLocal: number;
+  crossBorderShippingLocal: number;
+  discountedLocalPrice: number;
+  preDiscountLocalPrice: number;
+  currencyCode: string;
+  discountRate: number;
 }
 
-/**
- * Get a human-readable breakdown of the price calculation.
- */
+function parsePositiveNumber(value: string | number | undefined): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function getSourceCostCny(row: SourceRow): number | null {
+  return parsePositiveNumber(row['成本（有差值）']);
+}
+
+function getSourceWeightG(row: SourceRow): number | null {
+  return (
+    parsePositiveNumber(row['发货重量（有差值）']) ??
+    parsePositiveNumber(row['商品重量(g)'])
+  );
+}
+
+function getShippingSteps(weightKg: number, startWeightKg: number, stepWeightKg: number): number {
+  if (weightKg <= startWeightKg) {
+    return 0;
+  }
+
+  return Math.max(Math.ceil((weightKg - startWeightKg) / stepWeightKg - 1e-9), 0);
+}
+
 export function getPriceBreakdown(
   row: SourceRow,
-  params: PriceParams
-): {
-  cost: number;
-  weightG: number;
-  firstMile: number;
-  lastMile: number;
-  baseCost: number;
-  withProfit: number;
-  withFee: number;
-  finalPrice: number;
-} {
-  const cost = Number(row['成本（有差值）']) || 0;
-  const weightG = Number(row['发货重量（有差值）']) || Number(row['商品重量(g)']) || 0;
+  params: PriceParams,
+  exchangeRates: ExchangeRatesState | null
+): PriceBreakdown | null {
+  if (!exchangeRates) {
+    return null;
+  }
+
+  const preset = getPricingPreset(params.countryCode);
+  const costCny = getSourceCostCny(row);
+  const weightG = getSourceWeightG(row);
+  const usdToCny = exchangeRates.rates.CNY;
+  const usdToLocal = exchangeRates.rates[preset.currencyCode];
+
+  if (!costCny || !weightG || !usdToCny || !usdToLocal) {
+    return null;
+  }
+
   const weightKg = weightG / 1000;
+  const costUsd = (costCny + PACKAGE_HANDLING_FEE_CNY) / usdToCny;
+  const costLocal = costUsd * usdToLocal;
+  const shippingSteps = getShippingSteps(weightKg, preset.startWeightKg, preset.stepWeightKg);
+  const crossBorderShippingLocal = preset.startPrice + shippingSteps * preset.stepPrice;
+  const denominator = 1 - BASE_PROFIT_RATE - preset.totalFeeRate;
+  if (denominator <= 0) {
+    return null;
+  }
 
-  const firstMile = weightKg * params.firstMileRate;
-  const lastMile = weightKg * params.lastMileRate;
-  const baseCost = cost + params.additionalCost + firstMile + lastMile;
-  const withProfit = baseCost * params.profitMultiplier;
-  const withFee = withProfit / (1 - params.platformFeeRate);
-  const finalPrice = Math.round((withFee / params.exchangeRate) * 100) / 100;
+  const baseAfterFees = (costLocal + crossBorderShippingLocal) / denominator;
+  const discountedLocalPrice = applyRoundRule(
+    baseAfterFees * preset.taxMultiplier,
+    preset.discountedPriceRule
+  );
 
-  return { cost, weightG, firstMile, lastMile, baseCost, withProfit, withFee, finalPrice };
+  const discountDenominator = 1 - params.discountRate;
+  if (discountDenominator <= 0) {
+    return null;
+  }
+
+  const preDiscountLocalPrice = applyRoundRule(
+    discountedLocalPrice / discountDenominator,
+    preset.preDiscountPriceRule
+  );
+
+  return {
+    costCny,
+    weightG,
+    weightKg,
+    packageFeeCny: PACKAGE_HANDLING_FEE_CNY,
+    usdToCny,
+    usdToLocal,
+    crossBorderShippingLocal,
+    discountedLocalPrice,
+    preDiscountLocalPrice,
+    currencyCode: preset.currencyCode,
+    discountRate: params.discountRate,
+  };
+}
+
+export function calculatePrice(
+  row: SourceRow,
+  params: PriceParams,
+  exchangeRates: ExchangeRatesState | null
+): number | '' {
+  return getPriceBreakdown(row, params, exchangeRates)?.preDiscountLocalPrice ?? '';
 }

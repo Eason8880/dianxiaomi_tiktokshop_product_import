@@ -15,7 +15,7 @@ export const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
   { value: 'dark', label: '深色' },
 ];
 
-export function isThemePreference(value: string | null): value is ThemePreference {
+export function isThemePreference(value: string | null | undefined): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 

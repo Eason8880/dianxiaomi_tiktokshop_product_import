@@ -23,14 +23,22 @@ export interface ColumnMapping {
   description?: string;
 }
 
+export type CountryCode = 'PH' | 'MY' | 'SG' | 'TH' | 'VN';
+export type ExchangeRateCode = 'CNY' | 'PHP' | 'MYR' | 'SGD' | 'THB' | 'VND';
+
 // Price calculation parameters
 export interface PriceParams {
-  exchangeRate: number;       // RMB per target currency (e.g., 7.2 for USD)
-  firstMileRate: number;      // RMB per kg for first-mile shipping
-  lastMileRate: number;       // RMB per kg for last-mile shipping
-  profitMultiplier: number;   // Markup multiplier
-  platformFeeRate: number;    // Platform fee percentage (0-1)
-  additionalCost: number;     // Fixed additional cost per item in RMB
+  countryCode: CountryCode;
+  discountRate: number;
+}
+
+export interface ExchangeRatesState {
+  base: 'USD';
+  provider: 'frankfurter';
+  providerDate: string;
+  rates: Record<ExchangeRateCode, number>;
+  fetchedAt: string;
+  isStale: boolean;
 }
 
 // Product group (multiple SKU rows sharing the same ERP ID)

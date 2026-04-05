@@ -1,10 +1,18 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { SourceRow, ColumnMapping, PriceParams, ProductGroup, TargetRow } from '@/types';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  SourceRow,
+  ColumnMapping,
+  PriceParams,
+  ProductGroup,
+  TargetRow,
+  ExchangeRatesState,
+} from '@/types';
 import { DEFAULT_MAPPINGS, DEFAULT_PRICE_PARAMS } from '@/lib/constants';
 import { groupByProduct } from '@/lib/product-grouper';
 import { applyMappings } from '@/lib/column-mapping';
+import { getPricingPreset } from '@/lib/pricing-config';
 import { FileUpload } from '@/components/FileUpload';
 import { DataPreview } from '@/components/DataPreview';
 import { ColumnMappingEditor } from '@/components/ColumnMapping';
@@ -28,6 +36,20 @@ const STEPS = [
   { id: 6, title: '导出', desc: '预览并下载上架表格' },
 ];
 
+async function fetchExchangeRates(forceRefresh = false): Promise<ExchangeRatesState> {
+  const query = forceRefresh ? '?refresh=1' : '';
+  const response = await fetch(`/api/exchange-rates${query}`, {
+    cache: 'no-store',
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+
+  return data as ExchangeRatesState;
+}
+
 export default function Home() {
   const [step, setStep] = useState(1);
   const [sourceHeaders, setSourceHeaders] = useState<string[]>([]);
@@ -37,6 +59,9 @@ export default function Home() {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [warehouseName, setWarehouseName] = useState('');
   const [defaultBrand, setDefaultBrand] = useState('无品牌');
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRatesState | null>(null);
+  const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
+  const [exchangeRatesError, setExchangeRatesError] = useState<string | null>(null);
 
   function handleDataParsed(headers: string[], rows: SourceRow[]) {
     setSourceHeaders(headers);
@@ -52,12 +77,65 @@ export default function Home() {
     );
   }
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadRates() {
+      setExchangeRatesLoading(true);
+      setExchangeRatesError(null);
+
+      try {
+        const nextRates = await fetchExchangeRates();
+        if (!active) return;
+        setExchangeRates(nextRates);
+      } catch (error) {
+        if (!active) return;
+        setExchangeRatesError(error instanceof Error ? error.message : '汇率获取失败');
+      } finally {
+        if (active) {
+          setExchangeRatesLoading(false);
+        }
+      }
+    }
+
+    void loadRates();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleRefreshExchangeRates() {
+    setExchangeRatesLoading(true);
+    setExchangeRatesError(null);
+
+    try {
+      const nextRates = await fetchExchangeRates(true);
+      setExchangeRates(nextRates);
+    } catch (error) {
+      setExchangeRatesError(error instanceof Error ? error.message : '汇率获取失败');
+    } finally {
+      setExchangeRatesLoading(false);
+    }
+  }
+
   const targetRows: TargetRow[] = useMemo(() => {
     if (sourceRows.length === 0) return [];
-    return applyMappings(sourceRows, mappings, priceParams, productGroups, warehouseName);
-  }, [sourceRows, mappings, priceParams, productGroups, warehouseName]);
+    return applyMappings(
+      sourceRows,
+      mappings,
+      priceParams,
+      exchangeRates,
+      productGroups,
+      warehouseName
+    );
+  }, [sourceRows, mappings, priceParams, exchangeRates, productGroups, warehouseName]);
 
   const hasData = sourceRows.length > 0;
+  const currentPreset = getPricingPreset(priceParams.countryCode);
+  const pricingBlockedReason = hasData && !exchangeRates && !exchangeRatesLoading
+    ? exchangeRatesError || `未能获取 ${currentPreset.countryName} 定价所需汇率，当前无法导出价格`
+    : null;
 
   return (
     <div className="min-h-screen bg-background animate-fade-in-up">
@@ -203,7 +281,11 @@ export default function Home() {
               <PriceCalculator
                 params={priceParams}
                 sampleRows={sourceRows}
+                exchangeRates={exchangeRates}
+                exchangeRatesLoading={exchangeRatesLoading}
+                exchangeRatesError={exchangeRatesError}
                 onChange={setPriceParams}
+                onRefreshExchangeRates={handleRefreshExchangeRates}
               />
             )}
 
@@ -215,7 +297,7 @@ export default function Home() {
             )}
 
             {step === 6 && (
-              <ExportPreview rows={targetRows} />
+              <ExportPreview rows={targetRows} pricingBlockedReason={pricingBlockedReason} />
             )}
           </CardContent>
         </Card>

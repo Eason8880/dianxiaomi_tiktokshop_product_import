@@ -1,101 +1,209 @@
 'use client';
 
-import { PriceParams, SourceRow } from '@/types';
+import { ExchangeRatesState, PriceParams, SourceRow, CountryCode } from '@/types';
 import { getPriceBreakdown } from '@/lib/price-calculator';
+import {
+  BASE_PROFIT_RATE,
+  COUNTRY_OPTIONS,
+  getPricingPreset,
+  PACKAGE_HANDLING_FEE_CNY,
+} from '@/lib/pricing-config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { getZebraTableToneClass } from '@/lib/table-contrast';
 
 interface PriceCalculatorProps {
   params: PriceParams;
   sampleRows: SourceRow[];
+  exchangeRates: ExchangeRatesState | null;
+  exchangeRatesLoading: boolean;
+  exchangeRatesError: string | null;
   onChange: (params: PriceParams) => void;
+  onRefreshExchangeRates: () => void;
 }
 
-export function PriceCalculator({ params, sampleRows, onChange }: PriceCalculatorProps) {
-  function update(key: keyof PriceParams, value: string) {
+function formatFixedNumber(value: number | null | undefined, digits = 2): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '—';
+  }
+
+  return value.toFixed(digits);
+}
+
+function formatFlexibleNumber(value: number | null | undefined, digits = 2): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '—';
+  }
+
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+    useGrouping: false,
+  });
+}
+
+export function PriceCalculator({
+  params,
+  sampleRows,
+  exchangeRates,
+  exchangeRatesLoading,
+  exchangeRatesError,
+  onChange,
+  onRefreshExchangeRates,
+}: PriceCalculatorProps) {
+  const preset = getPricingPreset(params.countryCode);
+
+  function updateDiscountRate(value: string) {
     const num = parseFloat(value);
     if (!isNaN(num)) {
-      onChange({ ...params, [key]: num });
+      onChange({ ...params, discountRate: num });
     }
+  }
+
+  function updateCountry(countryCode: CountryCode | null) {
+    if (!countryCode) {
+      return;
+    }
+
+    const nextCountry = countryCode;
+    const nextPreset = getPricingPreset(nextCountry);
+    onChange({
+      countryCode: nextCountry,
+      discountRate: nextPreset.defaultDiscountRate,
+    });
   }
 
   const previewRows = sampleRows.slice(0, 8);
 
   return (
     <div className="space-y-6">
-      {/* Formula display */}
       <Card className="bg-primary/8 border border-primary/20">
         <CardContent className="py-4">
           <p className="text-sm text-primary/90 font-mono">
-            售价 = ((成本 + 附加费用 + 重量kg × 头程运费/kg + 重量kg × 尾程运费/kg) × 利润倍率)
+            成本(站点币种) = ((成本 + 0.8元处理费) / USD/CNY) × USD/{preset.currencyCode}
           </p>
-          <p className="text-sm text-primary/90 font-mono mt-1 ml-8">
-            / (1 - 平台费率) / 汇率
+          <p className="text-sm text-primary/90 font-mono mt-1">
+            折后售价 = ((成本(站点币种) + 跨境物流) / (1 - {BASE_PROFIT_RATE.toFixed(2)} - 国家综合费率)) × 税费系数
+          </p>
+          <p className="text-sm text-primary/90 font-mono mt-1">
+            导出折前售价 = 折后售价 / (1 - 折扣)
           </p>
         </CardContent>
       </Card>
 
-      {/* Parameters */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label className="text-sm">汇率（人民币/目标货币）</Label>
-          <Input
-            type="number" step="0.01" min="0.01"
-            value={params.exchangeRate}
-            onChange={(e) => update('exchangeRate', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">例如 USD: 7.2，GBP: 9.1</p>
+          <Label className="text-sm">站点国家</Label>
+          <Select value={params.countryCode} onValueChange={updateCountry}>
+            <SelectTrigger className="w-full h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COUNTRY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">切换国家后会恢复该站点默认折扣</p>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-sm">头程运费（元/kg）</Label>
+          <Label className="text-sm">折扣</Label>
           <Input
-            type="number" step="0.1" min="0"
-            value={params.firstMileRate}
-            onChange={(e) => update('firstMileRate', e.target.value)}
+            type="number"
+            step="0.01"
+            min="0"
+            max="0.99"
+            value={params.discountRate}
+            onChange={(e) => updateDiscountRate(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">国内到仓库</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm">尾程运费（元/kg）</Label>
-          <Input
-            type="number" step="0.1" min="0"
-            value={params.lastMileRate}
-            onChange={(e) => update('lastMileRate', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">海外配送到买家</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm">利润倍率</Label>
-          <Input
-            type="number" step="0.1" min="1"
-            value={params.profitMultiplier}
-            onChange={(e) => update('profitMultiplier', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">例如 2.0 = 100% 加价</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm">平台费率</Label>
-          <Input
-            type="number" step="0.01" min="0" max="1"
-            value={params.platformFeeRate}
-            onChange={(e) => update('platformFeeRate', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">例如 0.08 = 8%</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm">附加费用（元/件）</Label>
-          <Input
-            type="number" step="0.1" min="0"
-            value={params.additionalCost}
-            onChange={(e) => update('additionalCost', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">包装、标签等固定成本</p>
+          <p className="text-xs text-muted-foreground">0.45 表示 45% 折扣，最终导出折前售价</p>
         </div>
       </div>
 
-      {/* Price preview */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">汇率与国家规则</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm text-muted-foreground">
+              当前站点：<span className="text-foreground font-medium">{preset.countryName}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefreshExchangeRates}
+              disabled={exchangeRatesLoading}
+            >
+              {exchangeRatesLoading ? '刷新中…' : '刷新汇率'}
+            </Button>
+          </div>
+
+          {exchangeRatesError && !exchangeRates && (
+            <Alert variant="destructive">
+              <AlertDescription>{exchangeRatesError}</AlertDescription>
+            </Alert>
+          )}
+
+          {exchangeRates && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-sm">
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <p className="text-muted-foreground">USD/CNY</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">{formatFixedNumber(exchangeRates.rates.CNY, 4)}</p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <p className="text-muted-foreground">USD/{preset.currencyCode}</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">
+                    {formatFixedNumber(exchangeRates.rates[preset.currencyCode], 4)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <p className="text-muted-foreground">汇率日期</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">{exchangeRates.providerDate}</p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <p className="text-muted-foreground">状态</p>
+                  <p className={`mt-1 text-lg font-semibold ${exchangeRates.isStale ? 'text-[oklch(0.75_0.15_80)]' : 'text-foreground'}`}>
+                    {exchangeRates.isStale ? '缓存值' : '最新值'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-xs text-muted-foreground">
+                <div>包裹处理费：{PACKAGE_HANDLING_FEE_CNY.toFixed(1)} CNY</div>
+                <div>综合费率：{(preset.totalFeeRate * 100).toFixed(2)}%</div>
+                <div>税费系数：{preset.taxMultiplier.toFixed(4)}</div>
+                <div>
+                  物流规则：{preset.startWeightKg.toFixed(2)}kg 起 {preset.startPrice} {preset.currencyCode}，
+                  每 {preset.stepWeightKg.toFixed(2)}kg 续 {preset.stepPrice}
+                </div>
+              </div>
+
+              {exchangeRates.isStale && (
+                <Alert>
+                  <AlertDescription>
+                    当前展示的是最近一次成功获取的缓存汇率。抓取时间：{exchangeRates.fetchedAt}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {previewRows.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
@@ -109,22 +217,28 @@ export function PriceCalculator({ params, sampleRows, onChange }: PriceCalculato
                     <th className="px-3 py-2 text-left font-medium text-muted-foreground">SKU</th>
                     <th className="px-3 py-2 text-right font-medium text-muted-foreground">成本(¥)</th>
                     <th className="px-3 py-2 text-right font-medium text-muted-foreground">重量(g)</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">头程(¥)</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">尾程(¥)</th>
-                    <th className="px-3 py-2 text-right font-medium text-primary">售价</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">处理费(¥)</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">跨境物流({preset.currencyCode})</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">折后售价({preset.currencyCode})</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">折扣</th>
+                    <th className="px-3 py-2 text-right font-medium text-primary">导出折前售价({preset.currencyCode})</th>
                   </tr>
                 </thead>
                 <tbody>
                   {previewRows.map((row, i) => {
-                    const b = getPriceBreakdown(row, params);
+                    const b = getPriceBreakdown(row, params, exchangeRates);
                     return (
                       <tr key={i} className={`border-b last:border-0 border-border transition-colors ${getZebraTableToneClass(i)}`}>
                         <td className="px-3 py-2 text-foreground">{String(row['Seller SKU'] || `#${i + 1}`)}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{b.cost.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{b.weightG}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{b.firstMile.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{b.lastMile.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-primary">{b.finalPrice.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{formatFlexibleNumber(b?.costCny)}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{typeof b?.weightG === 'number' ? b.weightG : '—'}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{formatFlexibleNumber(b?.packageFeeCny)}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{formatFlexibleNumber(b?.crossBorderShippingLocal)}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{formatFlexibleNumber(b?.discountedLocalPrice)}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">
+                          {typeof b?.discountRate === 'number' ? `${(b.discountRate * 100).toFixed(0)}%` : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-primary">{formatFlexibleNumber(b?.preDiscountLocalPrice)}</td>
                       </tr>
                     );
                   })}

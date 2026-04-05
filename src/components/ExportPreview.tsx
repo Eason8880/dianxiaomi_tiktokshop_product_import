@@ -10,11 +10,12 @@ import { getZebraStickyToneClass, getZebraTableToneClass } from '@/lib/table-con
 
 interface ExportPreviewProps {
   rows: TargetRow[];
+  pricingBlockedReason?: string | null;
 }
 
 const PAGE_SIZE = 20;
 
-export function ExportPreview({ rows }: ExportPreviewProps) {
+export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps) {
   const [page, setPage] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
             </>
           )}
         </div>
-        <Button onClick={handleExport} disabled={exporting} className="gap-2">
+        <Button onClick={handleExport} disabled={exporting || Boolean(pricingBlockedReason)} className="gap-2">
           {exporting ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -86,6 +87,12 @@ export function ExportPreview({ rows }: ExportPreviewProps) {
       {exportError && (
         <Alert variant="destructive">
           <AlertDescription>{exportError}</AlertDescription>
+        </Alert>
+      )}
+
+      {pricingBlockedReason && (
+        <Alert variant="destructive">
+          <AlertDescription>{pricingBlockedReason}</AlertDescription>
         </Alert>
       )}
 

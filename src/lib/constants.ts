@@ -171,10 +171,6 @@ export const DEFAULT_MAPPINGS: ColumnMapping[] = [
 
 // Default price calculation parameters
 export const DEFAULT_PRICE_PARAMS: PriceParams = {
-  exchangeRate: 7.2,
-  firstMileRate: 8,
-  lastMileRate: 60,
-  profitMultiplier: 2.0,
-  platformFeeRate: 0.08,
-  additionalCost: 1.0,
+  countryCode: 'PH',
+  discountRate: 0.45,
 };

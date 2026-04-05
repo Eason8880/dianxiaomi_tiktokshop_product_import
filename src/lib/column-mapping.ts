@@ -1,4 +1,4 @@
-import { ColumnMapping, SourceRow, TargetRow, PriceParams, ProductGroup } from '@/types';
+import { ColumnMapping, SourceRow, TargetRow, PriceParams, ProductGroup, ExchangeRatesState } from '@/types';
 import { TARGET_COLUMNS } from './constants';
 import { calculatePrice } from './price-calculator';
 
@@ -26,6 +26,7 @@ export function applyMappings(
   sourceRows: SourceRow[],
   mappings: ColumnMapping[],
   priceParams: PriceParams,
+  exchangeRates: ExchangeRatesState | null,
   productGroups: ProductGroup[],
   warehouseName: string
 ): TargetRow[] {
@@ -63,7 +64,7 @@ export function applyMappings(
 
       // Handle calculated price
       if (transform === 'calculated') {
-        value = calculatePrice(sourceRow, priceParams);
+        value = calculatePrice(sourceRow, priceParams, exchangeRates);
         targetRow[targetColumn] = value;
         continue;
       }
@@ -146,7 +147,8 @@ export function applyMappings(
 export function previewMapping(
   sourceRow: SourceRow,
   mappings: ColumnMapping[],
-  priceParams: PriceParams
+  priceParams: PriceParams,
+  exchangeRates: ExchangeRatesState | null
 ): Record<string, string> {
   const preview: Record<string, string> = {};
 
@@ -154,7 +156,7 @@ export function previewMapping(
     const { targetColumn, sourceColumn, transform, fixedValue } = mapping;
 
     if (transform === 'calculated') {
-      preview[targetColumn] = String(calculatePrice(sourceRow, priceParams));
+      preview[targetColumn] = String(calculatePrice(sourceRow, priceParams, exchangeRates));
       continue;
     }
 
