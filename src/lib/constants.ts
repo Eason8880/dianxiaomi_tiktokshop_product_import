@@ -1,4 +1,5 @@
 import { ColumnMapping, PriceParams } from '@/types';
+import { DEFAULT_DISCOUNT_RATE } from '@/lib/pricing-config';
 
 export const CATEGORY_LOOKUP_REGION = 'PH';
 
@@ -173,5 +174,5 @@ export const DEFAULT_MAPPINGS: ColumnMapping[] = [
 export const DEFAULT_PRICE_PARAMS: PriceParams = {
   countryCode: 'PH',
   pricingProfitRate: 0.28,
-  discountRate: 0.45,
+  discountRate: DEFAULT_DISCOUNT_RATE,
 };

@@ -1,6 +1,7 @@
 import { CountryCode, ExchangeRateCode } from '@/types';
 
 export const PACKAGE_HANDLING_FEE_CNY = 0.8;
+export const DEFAULT_DISCOUNT_RATE = 0.45;
 
 export interface RoundRule {
   mode: 'round' | 'ceil' | 'none';
@@ -13,7 +14,6 @@ export interface PricingPreset {
   currencyCode: ExchangeRateCode;
   totalFeeRate: number;
   taxMultiplier: number;
-  defaultDiscountRate: number;
   startWeightKg: number;
   stepWeightKg: number;
   startPrice: number;
@@ -47,7 +47,6 @@ export const PRICING_PRESETS: Record<CountryCode, PricingPreset> = {
     currencyCode: 'PHP',
     totalFeeRate: 0.2524,
     taxMultiplier: 1,
-    defaultDiscountRate: 0.45,
     startWeightKg: 0.01,
     stepWeightKg: 0.01,
     startPrice: 4.5,
@@ -62,7 +61,6 @@ export const PRICING_PRESETS: Record<CountryCode, PricingPreset> = {
     currencyCode: 'MYR',
     totalFeeRate: 0.2498,
     taxMultiplier: 1.1,
-    defaultDiscountRate: 0.45,
     startWeightKg: 0.01,
     stepWeightKg: 0.01,
     startPrice: 0.69,
@@ -77,7 +75,6 @@ export const PRICING_PRESETS: Record<CountryCode, PricingPreset> = {
     currencyCode: 'SGD',
     totalFeeRate: 0.2081,
     taxMultiplier: 1.09,
-    defaultDiscountRate: 0.45,
     startWeightKg: 0.05,
     stepWeightKg: 0.01,
     startPrice: 0.98,
@@ -92,7 +89,6 @@ export const PRICING_PRESETS: Record<CountryCode, PricingPreset> = {
     currencyCode: 'THB',
     totalFeeRate: 0.2266,
     taxMultiplier: 1 + 0.1 + (1 + 0.1) * 0.1556,
-    defaultDiscountRate: 0.45,
     startWeightKg: 0.01,
     stepWeightKg: 0.01,
     startPrice: 2.07,
@@ -107,7 +103,6 @@ export const PRICING_PRESETS: Record<CountryCode, PricingPreset> = {
     currencyCode: 'VND',
     totalFeeRate: 0.26,
     taxMultiplier: 1.1,
-    defaultDiscountRate: 0.4,
     startWeightKg: 0.01,
     stepWeightKg: 0.01,
     startPrice: 13900,

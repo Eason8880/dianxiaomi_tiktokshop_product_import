@@ -4,6 +4,7 @@ import { ExchangeRatesState, PriceParams, SourceRow, CountryCode } from '@/types
 import { getPriceBreakdown } from '@/lib/price-calculator';
 import {
   COUNTRY_OPTIONS,
+  DEFAULT_DISCOUNT_RATE,
   getPricingPreset,
   PACKAGE_HANDLING_FEE_CNY,
 } from '@/lib/pricing-config';
@@ -100,11 +101,10 @@ export function PriceCalculator({
     }
 
     const nextCountry = countryCode;
-    const nextPreset = getPricingPreset(nextCountry);
     onChange({
       countryCode: nextCountry,
       pricingProfitRate: params.pricingProfitRate,
-      discountRate: nextPreset.defaultDiscountRate,
+      discountRate: DEFAULT_DISCOUNT_RATE,
     });
   }
 
