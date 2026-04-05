@@ -52,7 +52,7 @@ function toExchangeRatesState(rows: FrankfurterResponse[]): ExchangeRatesState {
   }
 
   const rates = {} as Record<ExchangeRateCode, number>;
-  const providerDates: string[] = [];
+  const rateDates = {} as Record<ExchangeRateCode, string>;
 
   for (const code of REQUIRED_EXCHANGE_RATE_CODES) {
     const quoteRows = rowsByQuote.get(code);
@@ -63,22 +63,19 @@ function toExchangeRatesState(rows: FrankfurterResponse[]): ExchangeRatesState {
     quoteRows.sort((a, b) => String(b.date).localeCompare(String(a.date)));
     const latestRow = quoteRows[0];
     rates[code] = latestRow.rate as number;
-    providerDates.push(latestRow.date as string);
+    rateDates[code] = latestRow.date as string;
   }
 
-  const uniqueDates = Array.from(new Set(providerDates)).sort();
+  const uniqueDates = Array.from(new Set(Object.values(rateDates))).sort();
   if (uniqueDates.length === 0) {
     throw new Error('汇率服务返回了不完整的数据');
   }
 
-  const providerDate = uniqueDates.length === 1
-    ? uniqueDates[0]
-    : `${uniqueDates[0]}..${uniqueDates[uniqueDates.length - 1]}`;
-
   return {
     base: 'USD',
     provider: 'frankfurter',
-    providerDate,
+    providerDate: uniqueDates[uniqueDates.length - 1],
+    rateDates,
     rates,
     fetchedAt: new Date().toISOString(),
     isStale: false,

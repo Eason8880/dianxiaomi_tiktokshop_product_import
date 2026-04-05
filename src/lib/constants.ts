@@ -172,5 +172,6 @@ export const DEFAULT_MAPPINGS: ColumnMapping[] = [
 // Default price calculation parameters
 export const DEFAULT_PRICE_PARAMS: PriceParams = {
   countryCode: 'PH',
+  pricingProfitRate: 0.28,
   discountRate: 0.45,
 };

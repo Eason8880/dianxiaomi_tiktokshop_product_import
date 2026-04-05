@@ -1,6 +1,5 @@
 import { CountryCode, ExchangeRateCode } from '@/types';
 
-export const BASE_PROFIT_RATE = 0.28;
 export const PACKAGE_HANDLING_FEE_CNY = 0.8;
 
 export interface RoundRule {

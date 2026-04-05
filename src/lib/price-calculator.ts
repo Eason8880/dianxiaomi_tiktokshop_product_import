@@ -1,7 +1,6 @@
 import { ExchangeRatesState, PriceParams, SourceRow } from '@/types';
 import {
   applyRoundRule,
-  BASE_PROFIT_RATE,
   getPricingPreset,
   PACKAGE_HANDLING_FEE_CNY,
 } from '@/lib/pricing-config';
@@ -17,6 +16,7 @@ export interface PriceBreakdown {
   discountedLocalPrice: number;
   preDiscountLocalPrice: number;
   currencyCode: string;
+  pricingProfitRate: number;
   discountRate: number;
 }
 
@@ -81,7 +81,7 @@ export function getPriceBreakdown(
   const costLocal = costUsd * usdToLocal;
   const shippingSteps = getShippingSteps(weightKg, preset.startWeightKg, preset.stepWeightKg);
   const crossBorderShippingLocal = preset.startPrice + shippingSteps * preset.stepPrice;
-  const denominator = 1 - BASE_PROFIT_RATE - preset.totalFeeRate;
+  const denominator = 1 - params.pricingProfitRate - preset.totalFeeRate;
   if (denominator <= 0) {
     return null;
   }
@@ -113,6 +113,7 @@ export function getPriceBreakdown(
     discountedLocalPrice,
     preDiscountLocalPrice,
     currencyCode: preset.currencyCode,
+    pricingProfitRate: params.pricingProfitRate,
     discountRate: params.discountRate,
   };
 }

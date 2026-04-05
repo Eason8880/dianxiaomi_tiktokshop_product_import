@@ -3,7 +3,6 @@
 import { ExchangeRatesState, PriceParams, SourceRow, CountryCode } from '@/types';
 import { getPriceBreakdown } from '@/lib/price-calculator';
 import {
-  BASE_PROFIT_RATE,
   COUNTRY_OPTIONS,
   getPricingPreset,
   PACKAGE_HANDLING_FEE_CNY,
@@ -18,7 +17,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select';
 import { getZebraTableToneClass } from '@/lib/table-contrast';
 
@@ -52,6 +50,27 @@ function formatFlexibleNumber(value: number | null | undefined, digits = 2): str
   });
 }
 
+function formatPercentValue(rate: number | null | undefined, digits = 2): string {
+  if (typeof rate !== 'number' || !Number.isFinite(rate)) {
+    return '—';
+  }
+
+  const percentage = rate * 100;
+  const fixed = percentage.toFixed(digits);
+  return fixed.replace(/\.?0+$/, '');
+}
+
+function getCurrencyDateEntries(exchangeRates: ExchangeRatesState) {
+  return [
+    { label: 'USD/CNY', date: exchangeRates.rateDates.CNY },
+    { label: 'USD/PHP', date: exchangeRates.rateDates.PHP },
+    { label: 'USD/MYR', date: exchangeRates.rateDates.MYR },
+    { label: 'USD/SGD', date: exchangeRates.rateDates.SGD },
+    { label: 'USD/THB', date: exchangeRates.rateDates.THB },
+    { label: 'USD/VND', date: exchangeRates.rateDates.VND },
+  ];
+}
+
 export function PriceCalculator({
   params,
   sampleRows,
@@ -62,12 +81,17 @@ export function PriceCalculator({
   onRefreshExchangeRates,
 }: PriceCalculatorProps) {
   const preset = getPricingPreset(params.countryCode);
+  const selectedCountry = COUNTRY_OPTIONS.find((option) => option.value === params.countryCode);
 
-  function updateDiscountRate(value: string) {
+  function updatePercentField(key: 'pricingProfitRate' | 'discountRate', value: string) {
     const num = parseFloat(value);
     if (!isNaN(num)) {
-      onChange({ ...params, discountRate: num });
+      onChange({ ...params, [key]: num / 100 });
     }
+  }
+
+  function getPercentDisplayValue(rate: number): string {
+    return formatPercentValue(rate);
   }
 
   function updateCountry(countryCode: CountryCode | null) {
@@ -79,6 +103,7 @@ export function PriceCalculator({
     const nextPreset = getPricingPreset(nextCountry);
     onChange({
       countryCode: nextCountry,
+      pricingProfitRate: params.pricingProfitRate,
       discountRate: nextPreset.defaultDiscountRate,
     });
   }
@@ -93,7 +118,7 @@ export function PriceCalculator({
             成本(站点币种) = ((成本 + 0.8元处理费) / USD/CNY) × USD/{preset.currencyCode}
           </p>
           <p className="text-sm text-primary/90 font-mono mt-1">
-            折后售价 = ((成本(站点币种) + 跨境物流) / (1 - {BASE_PROFIT_RATE.toFixed(2)} - 国家综合费率)) × 税费系数
+            折后售价 = ((成本(站点币种) + 跨境物流) / (1 - 定价利润率 - 国家综合费率)) × 税费系数
           </p>
           <p className="text-sm text-primary/90 font-mono mt-1">
             导出折前售价 = 折后售价 / (1 - 折扣)
@@ -101,12 +126,14 @@ export function PriceCalculator({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-1.5">
           <Label className="text-sm">站点国家</Label>
           <Select value={params.countryCode} onValueChange={updateCountry}>
             <SelectTrigger className="w-full h-9">
-              <SelectValue />
+              <span className="flex-1 truncate text-left">
+                {selectedCountry ? `${selectedCountry.label} (${selectedCountry.value})` : '选择站点国家'}
+              </span>
             </SelectTrigger>
             <SelectContent>
               {COUNTRY_OPTIONS.map((option) => (
@@ -119,16 +146,40 @@ export function PriceCalculator({
           <p className="text-xs text-muted-foreground">切换国家后会恢复该站点默认折扣</p>
         </div>
         <div className="space-y-1.5">
+          <Label className="text-sm">定价利润率</Label>
+          <div className="relative">
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              max="99"
+              value={getPercentDisplayValue(params.pricingProfitRate)}
+              onChange={(e) => updatePercentField('pricingProfitRate', e.target.value)}
+              className="pr-10"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+              %
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">例如 28 表示 28% 定价利润率</p>
+        </div>
+        <div className="space-y-1.5">
           <Label className="text-sm">折扣</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            max="0.99"
-            value={params.discountRate}
-            onChange={(e) => updateDiscountRate(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">0.45 表示 45% 折扣，最终导出折前售价</p>
+          <div className="relative">
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              max="99"
+              value={getPercentDisplayValue(params.discountRate)}
+              onChange={(e) => updatePercentField('discountRate', e.target.value)}
+              className="pr-10"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+              %
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">例如 45 表示 45% 折扣，最终导出折前售价</p>
         </div>
       </div>
 
@@ -171,7 +222,7 @@ export function PriceCalculator({
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-                  <p className="text-muted-foreground">汇率日期</p>
+                  <p className="text-muted-foreground">最新汇率日</p>
                   <p className="mt-1 text-lg font-semibold text-foreground">{exchangeRates.providerDate}</p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
@@ -184,11 +235,26 @@ export function PriceCalculator({
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-xs text-muted-foreground">
                 <div>包裹处理费：{PACKAGE_HANDLING_FEE_CNY.toFixed(1)} CNY</div>
-                <div>综合费率：{(preset.totalFeeRate * 100).toFixed(2)}%</div>
+                <div>综合费率：{formatPercentValue(preset.totalFeeRate)}%（含5%达人佣金）</div>
                 <div>税费系数：{preset.taxMultiplier.toFixed(4)}</div>
                 <div>
                   物流规则：{preset.startWeightKg.toFixed(2)}kg 起 {preset.startPrice} {preset.currencyCode}，
                   每 {preset.stepWeightKg.toFixed(2)}kg 续 {preset.stepPrice}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <p className="text-sm font-medium text-muted-foreground">各币种汇率日期</p>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 text-xs">
+                  {getCurrencyDateEntries(exchangeRates).map((entry) => (
+                    <div
+                      key={entry.label}
+                      className="rounded-md border border-border/50 bg-background/60 px-3 py-2"
+                    >
+                      <p className="text-muted-foreground">{entry.label}</p>
+                      <p className="mt-1 font-medium text-foreground">{entry.date}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -236,7 +302,7 @@ export function PriceCalculator({
                         <td className="px-3 py-2 text-right text-muted-foreground">{formatFlexibleNumber(b?.crossBorderShippingLocal)}</td>
                         <td className="px-3 py-2 text-right text-muted-foreground">{formatFlexibleNumber(b?.discountedLocalPrice)}</td>
                         <td className="px-3 py-2 text-right text-muted-foreground">
-                          {typeof b?.discountRate === 'number' ? `${(b.discountRate * 100).toFixed(0)}%` : '—'}
+                          {typeof b?.discountRate === 'number' ? `${formatPercentValue(b.discountRate)}%` : '—'}
                         </td>
                         <td className="px-3 py-2 text-right font-semibold text-primary">{formatFlexibleNumber(b?.preDiscountLocalPrice)}</td>
                       </tr>

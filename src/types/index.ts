@@ -29,6 +29,7 @@ export type ExchangeRateCode = 'CNY' | 'PHP' | 'MYR' | 'SGD' | 'THB' | 'VND';
 // Price calculation parameters
 export interface PriceParams {
   countryCode: CountryCode;
+  pricingProfitRate: number;
   discountRate: number;
 }
 
@@ -36,6 +37,7 @@ export interface ExchangeRatesState {
   base: 'USD';
   provider: 'frankfurter';
   providerDate: string;
+  rateDates: Record<ExchangeRateCode, string>;
   rates: Record<ExchangeRateCode, number>;
   fetchedAt: string;
   isStale: boolean;
