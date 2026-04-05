@@ -53,14 +53,6 @@ function dedupAttributes(group: ProductGroup): string[] {
   return result;
 }
 
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
-
 interface SingleResult {
   erpId: string;
   dimensions: 1 | 2;
@@ -155,39 +147,36 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
     setProgress(0);
     abortRef.current = new AbortController();
 
-    const chunks = chunkArray(toAnalyze, 20);
     try {
-      for (let i = 0; i < chunks.length; i++) {
+      for (let i = 0; i < toAnalyze.length; i++) {
         if (abortRef.current.signal.aborted) break;
-        const chunk = chunks[i];
-        setCurrentProduct(chunk[0].chineseName || chunk[0].erpId);
+        const group = toAnalyze[i];
+        setCurrentProduct(group.chineseName || group.erpId);
 
-        // Mark chunk as pending
         onGroupsUpdate((prev) =>
           prev.map((g) =>
-            chunk.some((c) => c.erpId === g.erpId)
+            g.erpId === group.erpId
               ? { ...g, variantAnalysisStatus: 'pending', variantAnalysisSkipped: false, variantAnalysisError: undefined }
               : g
           )
         );
 
         try {
-          const results = await callAnalyzeAPI(chunk, abortRef.current.signal);
+          const results = await callAnalyzeAPI([group], abortRef.current.signal);
           onGroupsUpdate((prev) => applyResults(prev, results));
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') break;
-          // Mark this chunk as error
           const msg = err instanceof Error ? err.message : '分析失败';
           onGroupsUpdate((prev) =>
             prev.map((g) =>
-              chunk.some((c) => c.erpId === g.erpId)
+              g.erpId === group.erpId
                 ? { ...g, variantAnalysisStatus: 'error', variantAnalysisError: msg }
                 : g
             )
           );
         }
 
-        setProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setProgress(Math.round(((i + 1) / toAnalyze.length) * 100));
       }
     } finally {
       setIsAnalyzing(false);
