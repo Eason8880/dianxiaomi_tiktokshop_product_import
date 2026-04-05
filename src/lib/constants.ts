@@ -1,5 +1,5 @@
 import { ColumnMapping, PriceParams } from '@/types';
-import { DEFAULT_DISCOUNT_RATE } from '@/lib/pricing-config';
+import { DEFAULT_PARAMS_BY_COUNTRY } from '@/lib/pricing-config';
 
 export const CATEGORY_LOOKUP_REGION = 'PH';
 
@@ -170,9 +170,8 @@ export const DEFAULT_MAPPINGS: ColumnMapping[] = [
   { targetColumn: '来源URL', sourceColumn: null, transform: 'none' },
 ];
 
-// Default price calculation parameters
+// Default price calculation parameters — single source of truth in DEFAULT_PARAMS_BY_COUNTRY.
 export const DEFAULT_PRICE_PARAMS: PriceParams = {
   countryCode: 'PH',
-  pricingProfitRate: 0.28,
-  discountRate: DEFAULT_DISCOUNT_RATE,
+  ...DEFAULT_PARAMS_BY_COUNTRY.PH,
 };

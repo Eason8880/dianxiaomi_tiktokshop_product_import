@@ -23,8 +23,20 @@ export interface ColumnMapping {
   description?: string;
 }
 
-export type CountryCode = 'PH' | 'MY' | 'SG' | 'TH' | 'VN';
-export type ExchangeRateCode = 'CNY' | 'PHP' | 'MYR' | 'SGD' | 'THB' | 'VND';
+export type CountryCode = 'PH' | 'MY' | 'SG' | 'TH' | 'VN' | 'GB' | 'DE' | 'FR' | 'IT' | 'ES' | 'MX';
+export type ExchangeRateCode =
+  | 'CNY'
+  | 'PHP'
+  | 'MYR'
+  | 'SGD'
+  | 'THB'
+  | 'VND'
+  | 'EUR'
+  | 'GBP'
+  | 'MXN';
+
+// Goods category tier (read per-row from source column 产品形态)
+export type ProductForm = '普货' | '特货' | '敏货';
 
 // Price calculation parameters
 export interface PriceParams {

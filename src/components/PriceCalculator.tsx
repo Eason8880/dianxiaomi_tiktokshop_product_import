@@ -4,9 +4,10 @@ import { ExchangeRatesState, PriceParams, SourceRow, CountryCode } from '@/types
 import { getPriceBreakdown } from '@/lib/price-calculator';
 import {
   COUNTRY_OPTIONS,
-  DEFAULT_DISCOUNT_RATE,
+  DEFAULT_PARAMS_BY_COUNTRY,
   getPricingPreset,
   PACKAGE_HANDLING_FEE_CNY,
+  type PricingPreset,
 } from '@/lib/pricing-config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -69,7 +70,47 @@ function getCurrencyDateEntries(exchangeRates: ExchangeRatesState) {
     { label: 'USD/SGD', date: exchangeRates.rateDates.SGD },
     { label: 'USD/THB', date: exchangeRates.rateDates.THB },
     { label: 'USD/VND', date: exchangeRates.rateDates.VND },
+    { label: 'USD/EUR', date: exchangeRates.rateDates.EUR },
+    { label: 'USD/GBP', date: exchangeRates.rateDates.GBP },
+    { label: 'USD/MXN', date: exchangeRates.rateDates.MXN },
   ];
+}
+
+// Formula card content differs per pricing mode. Keep each branch as a simple
+// list of <p> lines so the existing styled container can render any of them.
+function renderFormulaLines(preset: PricingPreset): string[] {
+  switch (preset.mode) {
+    case 'sea':
+      return [
+        `成本(站点币种) = ((成本 + 0.8元处理费) / USD/CNY) × USD/${preset.currencyCode}`,
+        '折后售价 = ((成本(站点币种) + 跨境物流) / (1 - 定价利润率 - 国家综合费率)) × 税费系数',
+        '导出折前售价 = 折后售价 / (1 - 折扣)',
+      ];
+    case 'europe':
+      return [
+        `成本(站点币种) = ((成本 + 0.8元处理费) / USD/CNY) × USD/${preset.currencyCode}`,
+        '跨境物流 = 起始运费 + max(重量kg - 0.05, 0) × 每公斤续费',
+        '税前价 = (成本(站点币种) + 跨境物流) / (1 - 定价利润率 - 平台佣金率)',
+        'VAT = (税前价 + 3.99) × VAT率 / (1 + VAT率)',
+        preset.countryCode === 'GB'
+          ? '折后售价 = round(税前价 + VAT + (若 ≥ £35 则 +£3.99), 2)'
+          : '折后售价 = round(税前价 + VAT, 2)',
+        '导出折前售价 = round(折后售价 / (1 - 折扣), 2)',
+      ];
+    case 'mexico':
+      return [
+        '成本(站点币种) = ((成本 + 0.8元处理费) / USD/CNY) × USD/MXN',
+        '跨境物流 = max(重量kg × 每公斤费 + 基础费 - SFP补贴(59), 0)',
+        '税前价 = (成本(站点币种) + 跨境物流) / (1 - 平台费率 - 定价利润率)',
+        '进口税 = max((税前价×1.335 + 59 - 4.5×USD/MXN) / 1.335 × 0.335, 6)',
+        '折后售价 = round(税前价 + 进口税, 2)',
+        '导出折前售价 = round(折后售价 / (1 - 折扣), 2)',
+      ];
+    default: {
+      const _exhaustive: never = preset;
+      return _exhaustive;
+    }
+  }
 }
 
 export function PriceCalculator({
@@ -101,10 +142,11 @@ export function PriceCalculator({
     }
 
     const nextCountry = countryCode;
+    const defaults = DEFAULT_PARAMS_BY_COUNTRY[nextCountry];
     onChange({
       countryCode: nextCountry,
-      pricingProfitRate: params.pricingProfitRate,
-      discountRate: DEFAULT_DISCOUNT_RATE,
+      pricingProfitRate: defaults.pricingProfitRate,
+      discountRate: defaults.discountRate,
     });
   }
 
@@ -114,15 +156,14 @@ export function PriceCalculator({
     <div className="space-y-6">
       <Card className="bg-primary/8 border border-primary/20">
         <CardContent className="py-4">
-          <p className="text-sm text-primary/90 font-mono">
-            成本(站点币种) = ((成本 + 0.8元处理费) / USD/CNY) × USD/{preset.currencyCode}
-          </p>
-          <p className="text-sm text-primary/90 font-mono mt-1">
-            折后售价 = ((成本(站点币种) + 跨境物流) / (1 - 定价利润率 - 国家综合费率)) × 税费系数
-          </p>
-          <p className="text-sm text-primary/90 font-mono mt-1">
-            导出折前售价 = 折后售价 / (1 - 折扣)
-          </p>
+          {renderFormulaLines(preset).map((line, idx) => (
+            <p
+              key={idx}
+              className={`text-sm text-primary/90 font-mono${idx === 0 ? '' : ' mt-1'}`}
+            >
+              {line}
+            </p>
+          ))}
         </CardContent>
       </Card>
 
@@ -143,7 +184,7 @@ export function PriceCalculator({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">切换国家后会恢复该站点默认折扣</p>
+          <p className="text-xs text-muted-foreground">切换国家后会恢复该站点默认利润率与折扣</p>
         </div>
         <div className="space-y-1.5">
           <Label className="text-sm">定价利润率</Label>
@@ -235,12 +276,44 @@ export function PriceCalculator({
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-xs text-muted-foreground">
                 <div>包裹处理费：{PACKAGE_HANDLING_FEE_CNY.toFixed(1)} CNY</div>
-                <div>综合费率：{formatPercentValue(preset.totalFeeRate)}%（含5%达人佣金）</div>
-                <div>税费系数：{preset.taxMultiplier.toFixed(4)}</div>
-                <div>
-                  物流规则：{preset.startWeightKg.toFixed(2)}kg 起 {preset.startPrice} {preset.currencyCode}，
-                  每 {preset.stepWeightKg.toFixed(2)}kg 续 {preset.stepPrice}
-                </div>
+                {preset.mode === 'sea' && (
+                  <>
+                    <div>综合费率：{formatPercentValue(preset.totalFeeRate)}%（含5%达人佣金）</div>
+                    <div>税费系数：{preset.taxMultiplier.toFixed(4)}</div>
+                    <div>
+                      物流规则：{preset.startWeightKg.toFixed(2)}kg 起 {preset.startPrice} {preset.currencyCode}，
+                      每 {preset.stepWeightKg.toFixed(2)}kg 续 {preset.stepPrice}
+                    </div>
+                  </>
+                )}
+                {preset.mode === 'europe' && (
+                  <>
+                    <div>平台佣金率：{formatPercentValue(preset.commissionRate)}%（含10%达人佣金）</div>
+                    <div>VAT(普货)：{formatPercentValue(preset.categories['普货'].vatRate)}%</div>
+                    <div>
+                      物流规则(普货)：{preset.startWeightKg.toFixed(2)}kg 起 {preset.categories['普货'].startPrice} {preset.currencyCode}，
+                      每 kg 续 {preset.categories['普货'].stepPricePerKg}
+                    </div>
+                    {preset.countryCode === 'GB' && preset.ukThresholdLocal !== undefined && (
+                      <div>
+                        阈值附加费：折后售价 ≥ £{preset.ukThresholdLocal} 时 +£{preset.ukThresholdSurcharge}
+                      </div>
+                    )}
+                    <div className="md:col-span-2 xl:col-span-4">
+                      产品形态读取源数据列 <code className="px-1 py-0.5 rounded bg-muted/60">产品形态</code>（默认普货），影响运费与 VAT
+                    </div>
+                  </>
+                )}
+                {preset.mode === 'mexico' && (
+                  <>
+                    <div>综合费率：{formatPercentValue(preset.platformFeeRate)}%（平台+SFP+电商税+达人+广告）</div>
+                    <div>进口税率：{formatPercentValue(preset.importTaxRate)}%（免税额 {preset.importTaxFreeThresholdUsd} USD，最低 {preset.minImportTaxLocal} {preset.currencyCode}）</div>
+                    <div>SFP物流补贴：{preset.sfpSubsidyLocal} {preset.currencyCode}</div>
+                    <div>
+                      物流规则：按重量分 {preset.shippingTiers.length} 档，每 kg {preset.shippingTiers[0].shipPerKg} {preset.currencyCode} + 基础费
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
