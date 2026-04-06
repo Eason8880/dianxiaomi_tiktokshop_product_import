@@ -157,8 +157,9 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Step indicator — chevron pipeline */}
-        {/* Each button is clip-path'd into a chevron shape so the triangle
-            area is always part of the button itself (no separate SVG needed). */}
+        {/* Each button has a right-pointing tip (flat left, pointed right).
+            Earlier buttons sit on top (zIndex descending) so their tips show
+            over the next button's left edge — creating ">" separators. */}
         <div className="flex items-stretch mb-6 overflow-x-auto pb-2">
           {STEPS.map((s, i) => {
             const isActive = step === s.id;
@@ -166,18 +167,12 @@ export default function Home() {
             const isEnabled = hasData || s.id === 1;
             const isFirst = i === 0;
             const isLast = i === STEPS.length - 1;
-            const C = 12; // chevron depth in px
+            const C = 14; // chevron tip depth in px
 
-            // Clip the button into a chevron/arrow shape.
-            // Later buttons are stacked on top (zIndex = i+1) and overlap the
-            // previous button's right tip by C px via negative margin-left.
-            const clipPath = isFirst && isLast
+            // Flat left side, right-pointing tip (omit tip on last step).
+            const clipPath = isLast
               ? undefined
-              : isFirst
-              ? `polygon(0 0, calc(100% - ${C}px) 0, 100% 50%, calc(100% - ${C}px) 100%, 0 100%)`
-              : isLast
-              ? `polygon(${C}px 0, 100% 0, 100% 100%, ${C}px 100%, 0 50%)`
-              : `polygon(${C}px 0, calc(100% - ${C}px) 0, 100% 50%, calc(100% - ${C}px) 100%, ${C}px 100%, 0 50%)`;
+              : `polygon(0 0, calc(100% - ${C}px) 0, 100% 50%, calc(100% - ${C}px) 100%, 0 100%)`;
 
             return (
               <button
@@ -186,11 +181,14 @@ export default function Home() {
                 disabled={!isEnabled}
                 style={{
                   clipPath,
-                  zIndex: i + 1,
-                  marginLeft: i > 0 ? `-${C}px` : undefined,
-                  // Extra left padding compensates for the left indentation on non-first items.
+                  // Earlier buttons rendered on top so their right tips are visible.
+                  zIndex: STEPS.length - i,
+                  // Shift each non-first button left so the previous tip overlaps it.
+                  marginLeft: !isFirst ? `-${C}px` : undefined,
+                  // Extra left padding keeps content clear of the overlapping previous tip.
                   paddingLeft: !isFirst ? `${C + 16}px` : '16px',
-                  paddingRight: !isLast ? `${C + 12}px` : '16px',
+                  // Extra right padding keeps content clear of this button's own tip.
+                  paddingRight: !isLast ? `${C + 8}px` : '16px',
                 }}
                 className={[
                   'relative flex items-center gap-2 py-2 text-sm font-medium transition-all duration-200 select-none font-heading flex-shrink-0',
