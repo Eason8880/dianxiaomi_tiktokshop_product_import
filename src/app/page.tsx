@@ -157,55 +157,62 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Step indicator — chevron pipeline */}
-        <div className="flex items-center gap-0 mb-6 overflow-x-auto pb-2">
+        {/* Each button is clip-path'd into a chevron shape so the triangle
+            area is always part of the button itself (no separate SVG needed). */}
+        <div className="flex items-stretch mb-6 overflow-x-auto pb-2">
           {STEPS.map((s, i) => {
             const isActive = step === s.id;
             const isDone = step > s.id;
             const isEnabled = hasData || s.id === 1;
+            const isFirst = i === 0;
+            const isLast = i === STEPS.length - 1;
+            const C = 12; // chevron depth in px
+
+            // Clip the button into a chevron/arrow shape.
+            // Later buttons are stacked on top (zIndex = i+1) and overlap the
+            // previous button's right tip by C px via negative margin-left.
+            const clipPath = isFirst && isLast
+              ? undefined
+              : isFirst
+              ? `polygon(0 0, calc(100% - ${C}px) 0, 100% 50%, calc(100% - ${C}px) 100%, 0 100%)`
+              : isLast
+              ? `polygon(${C}px 0, 100% 0, 100% 100%, ${C}px 100%, 0 50%)`
+              : `polygon(${C}px 0, calc(100% - ${C}px) 0, 100% 50%, calc(100% - ${C}px) 100%, ${C}px 100%, 0 50%)`;
 
             return (
-              <div key={s.id} className="flex items-center flex-shrink-0">
-                <button
-                  onClick={() => (isEnabled) && setStep(s.id)}
-                  disabled={!isEnabled}
-                  className={[
-                    'relative flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200 select-none font-heading',
-                    i === 0 ? 'rounded-l-md' : '',
-                    i === STEPS.length - 1 ? 'rounded-r-md' : '',
-                    isActive
-                      ? 'bg-primary text-primary-foreground glow-coral z-10'
-                      : isDone
-                      ? 'bg-card text-[oklch(0.72_0.17_162)] border-y border-border hover:bg-accent/40'
-                      : isEnabled
-                      ? 'bg-card text-muted-foreground border-y border-border hover:bg-accent/30 hover:text-foreground'
-                      : 'bg-card text-muted-foreground/30 border-y border-border cursor-not-allowed',
-                  ].join(' ')}
-                >
-                  <span className={[
-                    'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                    isActive ? 'bg-primary-foreground text-primary' : '',
-                    isDone ? 'bg-[oklch(0.72_0.17_162)] text-[oklch(0.12_0.020_162)]' : '',
-                    (!isActive && !isDone) ? 'bg-muted/60 text-muted-foreground' : '',
-                  ].join(' ')}>
-                    {isDone ? '✓' : s.id}
-                  </span>
-                  <span className="hidden sm:block whitespace-nowrap">{s.title}</span>
-                </button>
-
-                {i < STEPS.length - 1 && (
-                  <svg
-                    width="12" height="36" viewBox="0 0 12 36" fill="none"
-                    className={`flex-shrink-0 ${isDone ? 'text-[oklch(0.72_0.17_162)]/50' : 'text-border'}`}
-                  >
-                    {/* Fill left triangle with the left button's background so the page bg doesn't bleed through */}
-                    <polygon
-                      points="0,0 12,18 0,36"
-                      fill={isActive ? 'hsl(var(--primary))' : 'hsl(var(--card))'}
-                    />
-                    <path d="M0 0 L12 18 L0 36" stroke="currentColor" strokeWidth="1" />
-                  </svg>
-                )}
-              </div>
+              <button
+                key={s.id}
+                onClick={() => isEnabled && setStep(s.id)}
+                disabled={!isEnabled}
+                style={{
+                  clipPath,
+                  zIndex: i + 1,
+                  marginLeft: i > 0 ? `-${C}px` : undefined,
+                  // Extra left padding compensates for the left indentation on non-first items.
+                  paddingLeft: !isFirst ? `${C + 16}px` : '16px',
+                  paddingRight: !isLast ? `${C + 12}px` : '16px',
+                }}
+                className={[
+                  'relative flex items-center gap-2 py-2 text-sm font-medium transition-all duration-200 select-none font-heading flex-shrink-0',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : isDone
+                    ? 'bg-card text-[oklch(0.72_0.17_162)] hover:bg-accent/40'
+                    : isEnabled
+                    ? 'bg-card text-muted-foreground hover:bg-accent/30 hover:text-foreground'
+                    : 'bg-card text-muted-foreground/30 cursor-not-allowed',
+                ].join(' ')}
+              >
+                <span className={[
+                  'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                  isActive ? 'bg-primary-foreground text-primary' : '',
+                  isDone ? 'bg-[oklch(0.72_0.17_162)] text-[oklch(0.12_0.020_162)]' : '',
+                  (!isActive && !isDone) ? 'bg-muted/60 text-muted-foreground' : '',
+                ].join(' ')}>
+                  {isDone ? '✓' : s.id}
+                </span>
+                <span className="hidden sm:block whitespace-nowrap">{s.title}</span>
+              </button>
             );
           })}
         </div>
