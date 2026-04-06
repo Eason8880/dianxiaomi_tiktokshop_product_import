@@ -197,6 +197,11 @@ export default function Home() {
                     width="12" height="36" viewBox="0 0 12 36" fill="none"
                     className={`flex-shrink-0 ${isDone ? 'text-[oklch(0.72_0.17_162)]/50' : 'text-border'}`}
                   >
+                    {/* Fill left triangle with the left button's background so the page bg doesn't bleed through */}
+                    <polygon
+                      points="0,0 12,18 0,36"
+                      fill={isActive ? 'hsl(var(--primary))' : 'hsl(var(--card))'}
+                    />
                     <path d="M0 0 L12 18 L0 36" stroke="currentColor" strokeWidth="1" />
                   </svg>
                 )}
