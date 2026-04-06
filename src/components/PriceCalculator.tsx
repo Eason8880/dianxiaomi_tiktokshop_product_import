@@ -62,20 +62,6 @@ function formatPercentValue(rate: number | null | undefined, digits = 2): string
   return fixed.replace(/\.?0+$/, '');
 }
 
-function getCurrencyDateEntries(exchangeRates: ExchangeRatesState) {
-  return [
-    { label: 'USD/CNY', date: exchangeRates.rateDates.CNY },
-    { label: 'USD/PHP', date: exchangeRates.rateDates.PHP },
-    { label: 'USD/MYR', date: exchangeRates.rateDates.MYR },
-    { label: 'USD/SGD', date: exchangeRates.rateDates.SGD },
-    { label: 'USD/THB', date: exchangeRates.rateDates.THB },
-    { label: 'USD/VND', date: exchangeRates.rateDates.VND },
-    { label: 'USD/EUR', date: exchangeRates.rateDates.EUR },
-    { label: 'USD/GBP', date: exchangeRates.rateDates.GBP },
-    { label: 'USD/MXN', date: exchangeRates.rateDates.MXN },
-  ];
-}
-
 // Formula card content differs per pricing mode. Keep each branch as a simple
 // list of <p> lines so the existing styled container can render any of them.
 function renderFormulaLines(preset: PricingPreset): string[] {
@@ -314,21 +300,6 @@ export function PriceCalculator({
                     </div>
                   </>
                 )}
-              </div>
-
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-                <p className="text-sm font-medium text-muted-foreground">各币种汇率日期</p>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 text-xs">
-                  {getCurrencyDateEntries(exchangeRates).map((entry) => (
-                    <div
-                      key={entry.label}
-                      className="rounded-md border border-border/50 bg-background/60 px-3 py-2"
-                    >
-                      <p className="text-muted-foreground">{entry.label}</p>
-                      <p className="mt-1 font-medium text-foreground">{entry.date}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
 
               {exchangeRates.isStale && (
