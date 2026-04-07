@@ -135,7 +135,7 @@ export function isRequiredColumn(col: string): boolean {
 export const DEFAULT_MAPPINGS: ColumnMapping[] = [
   { targetColumn: '*分类id\n（必填）', sourceColumn: null, transform: 'none', description: '通过TikTok API获取或手动输入' },
   { targetColumn: '*产品标题\n（必填）', sourceColumn: '商品名称1', transform: 'none' },
-  { targetColumn: '*产品描述\n（必填）', sourceColumn: '描述（不包括图片）', transform: 'htmlToText' },
+  { targetColumn: '*产品描述\n（必填）', sourceColumn: '商品描述', transform: 'none' },
   { targetColumn: '品牌', sourceColumn: null, transform: 'fixedValue', fixedValue: '无品牌' },
   { targetColumn: '产品属性', sourceColumn: null, transform: 'none' },
   { targetColumn: 'SKU', sourceColumn: 'Seller SKU', transform: 'none' },
