@@ -117,7 +117,7 @@ export const DEFAULT_PARAMS_BY_COUNTRY: Record<
   FR: { pricingProfitRate: 0.35, discountRate: 0.42 },
   IT: { pricingProfitRate: 0.35, discountRate: 0.42 },
   ES: { pricingProfitRate: 0.35, discountRate: 0.42 },
-  MX: { pricingProfitRate: 0.3, discountRate: 0.4 },
+  MX: { pricingProfitRate: 0.25, discountRate: 0.4 },
 };
 
 // Reusable round rules for EU/UK/MX (all 2 decimal places — matches Excel ROUND).
