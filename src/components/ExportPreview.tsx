@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { TargetRow } from '@/types';
-import { TARGET_COLUMNS, TARGET_COLUMN_DISPLAY, isRequiredColumn } from '@/lib/constants';
+import { TargetRow, TemplateType } from '@/types';
+import {
+  TARGET_COLUMNS, TARGET_COLUMN_DISPLAY,
+  STORE_BACKEND_TARGET_COLUMNS, STORE_BACKEND_TARGET_COLUMN_DISPLAY,
+  isRequiredColumn,
+} from '@/lib/constants';
 import { exportToXlsx } from '@/lib/export-xlsx';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,21 +15,25 @@ import { getZebraStickyToneClass, getZebraTableToneClass } from '@/lib/table-con
 interface ExportPreviewProps {
   rows: TargetRow[];
   pricingBlockedReason?: string | null;
+  templateType?: TemplateType;
 }
 
 const PAGE_SIZE = 20;
 
-export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps) {
+export function ExportPreview({ rows, pricingBlockedReason, templateType = 'dianxiaomi' }: ExportPreviewProps) {
   const [page, setPage] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  // Validate required columns
+  const isStore = templateType === 'store';
+  const activeColumns = isStore ? STORE_BACKEND_TARGET_COLUMNS : TARGET_COLUMNS;
+  const displayMap = isStore ? STORE_BACKEND_TARGET_COLUMN_DISPLAY : TARGET_COLUMN_DISPLAY;
+
+  // Validate required columns (store template has no * prefixed columns, so this is dianxiaomi only)
   const missingRequired: { rowIdx: number; col: string }[] = [];
   rows.forEach((row, i) => {
-    for (const col of TARGET_COLUMNS) {
+    for (const col of activeColumns) {
       if (!isRequiredColumn(col)) continue;
-      // Category ID is optional (can be empty if user hasn't set it)
       if (col === '*分类id\n（必填）') continue;
       const val = row[col];
       if (val === null || val === undefined || val === '') {
@@ -41,7 +49,7 @@ export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps
     setExporting(true);
     setExportError(null);
     try {
-      await exportToXlsx(rows);
+      await exportToXlsx(rows, undefined, templateType);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : '导出失败');
     } finally {
@@ -56,7 +64,7 @@ export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps
         <div className="flex gap-3 text-sm text-muted-foreground">
           <span>共 <strong className="text-foreground">{rows.length}</strong> 行</span>
           <span>·</span>
-          <span><strong className="text-foreground">{TARGET_COLUMNS.length}</strong> 列</span>
+          <span><strong className="text-foreground">{activeColumns.length}</strong> 列</span>
           {missingRequired.length > 0 && (
             <>
               <span>·</span>
@@ -101,7 +109,7 @@ export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps
           <AlertDescription className="text-[oklch(0.75_0.15_80)] text-xs">
             以下必填项为空，导出文件可能无法直接导入店小秘。分类 ID 可在导出后手动填写。
             <br />
-            {[...new Set(missingRequired.map((m) => TARGET_COLUMN_DISPLAY[m.col] || m.col))].join('、')}
+            {[...new Set(missingRequired.map((m) => displayMap[m.col] || m.col))].join('、')}
           </AlertDescription>
         </Alert>
       )}
@@ -125,8 +133,8 @@ export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps
           <thead>
             <tr className="bg-muted/40 border-b border-border">
               <th className="px-3 py-2 text-left text-muted-foreground/50 sticky left-0 bg-muted/40 z-10">#</th>
-              {TARGET_COLUMNS.map((col) => {
-                const display = TARGET_COLUMN_DISPLAY[col] || col;
+              {activeColumns.map((col) => {
+                const display = displayMap[col] || col;
                 const req = isRequiredColumn(col);
                 return (
                   <th
@@ -149,7 +157,7 @@ export function ExportPreview({ rows, pricingBlockedReason }: ExportPreviewProps
               return (
                 <tr key={idx} className={`border-b last:border-0 border-border transition-colors ${rowToneClass}`}>
                   <td className={`px-3 py-2 text-muted-foreground/50 sticky left-0 z-10 ${stickyToneClass}`}>{globalIdx + 1}</td>
-                  {TARGET_COLUMNS.map((col) => {
+                  {activeColumns.map((col) => {
                     const val = row[col];
                     const isEmpty = val === null || val === undefined || val === '';
                     const req = isRequiredColumn(col);

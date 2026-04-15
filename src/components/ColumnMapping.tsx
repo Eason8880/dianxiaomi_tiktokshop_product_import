@@ -19,6 +19,14 @@ interface ColumnMappingProps {
   onChange: (mappings: ColumnMapping[]) => void;
 }
 
+// Columns whose value is determined by AI variant analysis; fixedValue is only a fallback.
+const VARIANT_NAME_COLUMNS = new Set([
+  '变种属性名称一',
+  '变种属性名称二',
+  '主要销售变体名称（主题）',
+  '次要销售变体名称（主题）',
+]);
+
 export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: ColumnMappingProps) {
   function updateMapping(idx: number, patch: Partial<ColumnMapping>) {
     const updated = mappings.map((m, i) => (i === idx ? { ...m, ...patch } : m));
@@ -40,6 +48,7 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
           {mappings.map((mapping, idx) => {
             const isRequired = isRequiredColumn(mapping.targetColumn);
             const displayName = TARGET_COLUMN_DISPLAY[mapping.targetColumn] || mapping.targetColumn;
+            const isVariantName = VARIANT_NAME_COLUMNS.has(mapping.targetColumn);
 
             return (
               <tr key={mapping.targetColumn} className={`border-b last:border-0 border-border transition-colors ${getZebraTableToneClass(idx)}`}>
@@ -73,6 +82,8 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
                 <td className="px-4 py-2">
                   {mapping.transform === 'calculated' ? (
                     <Badge variant="secondary" className="text-xs">定价公式</Badge>
+                  ) : isVariantName ? (
+                    <Badge variant="secondary" className="text-xs bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">AI 自动</Badge>
                   ) : mapping.transform === 'fixedValue' ? (
                     <Badge variant="secondary" className="text-xs bg-primary/15 text-primary border border-primary/20">固定值</Badge>
                   ) : (
@@ -95,7 +106,17 @@ export function ColumnMappingEditor({ mappings, sourceHeaders, onChange }: Colum
                   )}
                 </td>
                 <td className="px-4 py-2">
-                  {mapping.transform === 'fixedValue' ? (
+                  {isVariantName ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        className="h-8 text-xs w-28"
+                        placeholder="回退值…"
+                        value={mapping.fixedValue || ''}
+                        onChange={(e) => updateMapping(idx, { fixedValue: e.target.value })}
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">AI 分析优先，此为无分析结果时的回退值</span>
+                    </div>
+                  ) : mapping.transform === 'fixedValue' ? (
                     <Input
                       className="h-8 text-xs"
                       placeholder="输入固定值…"

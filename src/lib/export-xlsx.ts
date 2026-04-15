@@ -1,24 +1,30 @@
 'use client';
 
-import { TargetRow } from '@/types';
-import { TARGET_COLUMNS } from './constants';
+import { TargetRow, TemplateType } from '@/types';
+import { TARGET_COLUMNS, STORE_BACKEND_TARGET_COLUMNS } from './constants';
 
 /**
- * Export target rows to an xlsx file using the Dianxiaomi template as base.
- * Uses exceljs to preserve the template's header formatting (red font, wrap text).
+ * Export target rows to an xlsx file.
+ * Supports two templates: 'dianxiaomi' (店小秘) and 'store' (店铺后台).
  */
 export async function exportToXlsx(
   rows: TargetRow[],
-  filename?: string
+  filename?: string,
+  templateType: TemplateType = 'dianxiaomi'
 ): Promise<void> {
+  const isStore = templateType === 'store';
+  const activeColumns = isStore ? STORE_BACKEND_TARGET_COLUMNS : TARGET_COLUMNS;
+  const templateFile = isStore ? '/template_store_backend.xlsx' : '/template_tiktok.xlsx';
+  const defaultFilename = isStore ? 'store_backend' : 'dianxiaomi_tiktok';
+
   // Dynamic import to avoid SSR issues
   const ExcelJS = (await import('exceljs')).default;
   const { saveAs } = await import('file-saver');
 
   // Fetch the template file from public directory
-  const templateResponse = await fetch('/template_tiktok.xlsx');
+  const templateResponse = await fetch(templateFile);
   if (!templateResponse.ok) {
-    throw new Error('无法加载模板文件，请确认 template_tiktok.xlsx 存在于 public 目录');
+    throw new Error(`无法加载模板文件，请确认 ${templateFile} 存在于 public 目录`);
   }
   const templateBuffer = await templateResponse.arrayBuffer();
 
@@ -36,10 +42,8 @@ export async function exportToXlsx(
 
   headerRow.eachCell((cell, colNum) => {
     const text = String(cell.value || '').trim();
-    // Match against target columns (handle newlines in cell values)
-    for (const col of TARGET_COLUMNS) {
-      const normalizedCol = col.replace(/\n/g, '\n');
-      if (text === normalizedCol.replace(/\n/g, '\n') || text === col.replace('\n', '\n')) {
+    for (const col of activeColumns) {
+      if (text === col.replace(/\n/g, '\n')) {
         colIndexMap.set(col, colNum);
         break;
       }
@@ -48,7 +52,7 @@ export async function exportToXlsx(
 
   // If col map is empty, build it by position order
   if (colIndexMap.size === 0) {
-    TARGET_COLUMNS.forEach((col, idx) => {
+    activeColumns.forEach((col, idx) => {
       colIndexMap.set(col, idx + 1);
     });
   }
@@ -64,7 +68,7 @@ export async function exportToXlsx(
     const targetRow = rows[i];
     const excelRow = sheet.getRow(i + 2);
 
-    for (const col of TARGET_COLUMNS) {
+    for (const col of activeColumns) {
       const colIdx = colIndexMap.get(col);
       if (!colIdx) continue;
 
@@ -76,8 +80,7 @@ export async function exportToXlsx(
       } else if (typeof value === 'number') {
         cell.value = value;
       } else {
-        const strVal = String(value);
-        cell.value = strVal;
+        cell.value = String(value);
       }
     }
 
@@ -94,5 +97,5 @@ export async function exportToXlsx(
     .toISOString()
     .replace(/[-:T]/g, '')
     .substring(0, 14);
-  saveAs(blob, filename || `dianxiaomi_tiktok_${ts}.xlsx`);
+  saveAs(blob, filename || `${defaultFilename}_${ts}.xlsx`);
 }

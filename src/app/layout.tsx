@@ -25,8 +25,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TikTok Shop 商品上架工具 | 店小秘",
-  description: "将 ERP 导出表格转换为店小秘 TikTokShop 上架模板",
+  title: "TikTok Shop 商品上架工具",
+  description: "将商品数据转换为 TikTok Shop 上架表格，支持店小秘模板与店铺后台模板",
 };
 
 export default function RootLayout({

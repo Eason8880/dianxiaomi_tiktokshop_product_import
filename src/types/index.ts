@@ -24,6 +24,7 @@ export interface ColumnMapping {
 }
 
 export type CountryCode = 'PH' | 'MY' | 'SG' | 'TH' | 'VN' | 'GB' | 'DE' | 'FR' | 'IT' | 'ES' | 'MX';
+export type TemplateType = 'dianxiaomi' | 'store';
 export type ExchangeRateCode =
   | 'CNY'
   | 'PHP'

@@ -8,8 +8,9 @@ import {
   ProductGroup,
   TargetRow,
   ExchangeRatesState,
+  TemplateType,
 } from '@/types';
-import { DEFAULT_MAPPINGS, DEFAULT_PRICE_PARAMS } from '@/lib/constants';
+import { DEFAULT_MAPPINGS, DEFAULT_PRICE_PARAMS, STORE_BACKEND_DEFAULT_MAPPINGS, TARGET_COLUMNS, STORE_BACKEND_TARGET_COLUMNS } from '@/lib/constants';
 import { groupByProduct } from '@/lib/product-grouper';
 import { applyMappings } from '@/lib/column-mapping';
 import { getPricingPreset } from '@/lib/pricing-config';
@@ -52,6 +53,7 @@ async function fetchExchangeRates(forceRefresh = false): Promise<ExchangeRatesSt
 
 export default function Home() {
   const [step, setStep] = useState(1);
+  const [templateType, setTemplateType] = useState<TemplateType>('dianxiaomi');
   const [sourceHeaders, setSourceHeaders] = useState<string[]>([]);
   const [sourceRows, setSourceRows] = useState<SourceRow[]>([]);
   const [mappings, setMappings] = useState<ColumnMapping[]>(DEFAULT_MAPPINGS);
@@ -75,6 +77,13 @@ export default function Home() {
     setMappings((prev) =>
       prev.map((m) => (m.targetColumn === '品牌' ? { ...m, fixedValue: brand } : m))
     );
+  }
+
+  function handleTemplateChange(next: TemplateType) {
+    setTemplateType(next);
+    // Reset mappings to defaults for the selected template, preserving brand
+    const base = next === 'store' ? STORE_BACKEND_DEFAULT_MAPPINGS : DEFAULT_MAPPINGS;
+    setMappings(base.map((m) => (m.targetColumn === '品牌' ? { ...m, fixedValue: defaultBrand } : m)));
   }
 
   useEffect(() => {
@@ -127,9 +136,10 @@ export default function Home() {
       priceParams,
       exchangeRates,
       productGroups,
-      warehouseName
+      warehouseName,
+      templateType
     );
-  }, [sourceRows, mappings, priceParams, exchangeRates, productGroups, warehouseName]);
+  }, [sourceRows, mappings, priceParams, exchangeRates, productGroups, warehouseName, templateType]);
 
   const hasData = sourceRows.length > 0;
   const currentPreset = getPricingPreset(priceParams.countryCode);
@@ -149,7 +159,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-sm font-semibold text-foreground font-heading">TikTok Shop 商品上架工具</h1>
-            <p className="text-xs text-muted-foreground">店小秘批量上架表格生成器</p>
+            <p className="text-xs text-muted-foreground">支持店小秘模板与店铺后台模板</p>
           </div>
           <ThemeToggle />
         </div>
@@ -237,9 +247,37 @@ export default function Home() {
             {step === 1 && (
               <div className="space-y-6">
                 <FileUpload onDataParsed={handleDataParsed} />
+                {/* Template selector — always visible */}
+                <div className="space-y-2">
+                  <Label className="text-sm">导出模板</Label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'dianxiaomi', label: '店小秘模板', desc: `${TARGET_COLUMNS.length} 列` },
+                      { value: 'store', label: '店铺后台模板', desc: `${STORE_BACKEND_TARGET_COLUMNS.length} 列` },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleTemplateChange(opt.value)}
+                        className={[
+                          'flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150 text-left',
+                          templateType === opt.value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                        ].join(' ')}
+                      >
+                        <div className="font-semibold">{opt.label}</div>
+                        <div className="text-xs opacity-70">{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {hasData && (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-muted/40 border border-border/50">
+                    <div className={[
+                      'grid gap-4 p-4 rounded-lg bg-muted/40 border border-border/50',
+                      templateType === 'dianxiaomi' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1',
+                    ].join(' ')}>
                       <div className="space-y-1.5">
                         <Label className="text-sm">默认品牌名称</Label>
                         <Input
@@ -248,23 +286,25 @@ export default function Home() {
                           placeholder="无品牌"
                         />
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-destructive">* 仓库名称（必填）</Label>
-                        <Input
-                          value={warehouseName}
-                          onChange={(e) => {
-                            setWarehouseName(e.target.value);
-                            setMappings((prev) =>
-                              prev.map((m) =>
-                                m.targetColumn === '*仓库名称\n（必填）'
-                                  ? { ...m, fixedValue: e.target.value }
-                                  : m
-                              )
-                            );
-                          }}
-                          placeholder="填写店小秘中配置的仓库名称"
-                        />
-                      </div>
+                      {templateType === 'dianxiaomi' && (
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium text-destructive">* 仓库名称（必填）</Label>
+                          <Input
+                            value={warehouseName}
+                            onChange={(e) => {
+                              setWarehouseName(e.target.value);
+                              setMappings((prev) =>
+                                prev.map((m) =>
+                                  m.targetColumn === '*仓库名称\n（必填）'
+                                    ? { ...m, fixedValue: e.target.value }
+                                    : m
+                                )
+                              );
+                            }}
+                            placeholder="填写店小秘中配置的仓库名称"
+                          />
+                        </div>
+                      )}
                     </div>
                     <DataPreview headers={sourceHeaders} rows={sourceRows} />
                   </>
@@ -307,7 +347,7 @@ export default function Home() {
             )}
 
             {step === 6 && (
-              <ExportPreview rows={targetRows} pricingBlockedReason={pricingBlockedReason} />
+              <ExportPreview rows={targetRows} pricingBlockedReason={pricingBlockedReason} templateType={templateType} />
             )}
           </CardContent>
         </Card>
