@@ -1,6 +1,7 @@
 import { ColumnMapping, SourceRow, TargetRow, PriceParams, ProductGroup, ExchangeRatesState, TemplateType } from '@/types';
 import { TARGET_COLUMNS } from './constants';
 import { calculatePrice } from './price-calculator';
+import { getCategoryPath } from './category-map';
 
 /**
  * Convert HTML text literals to plain text.
@@ -63,7 +64,9 @@ export function applyMappings(
         continue;
       }
       if (targetColumn === '类目') {
-        value = group?.categoryName || group?.categoryPath?.join(' > ') || '';
+        const catId = group?.recommendedCategoryId || '';
+        const catPath = catId ? getCategoryPath(catId) : undefined;
+        value = catPath ?? catId;
         targetRow[targetColumn] = value;
         continue;
       }
