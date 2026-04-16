@@ -1,7 +1,7 @@
 'use client';
 
 import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ProductGroup, VariantDimension } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,20 +97,6 @@ export function VariantAnalysis({ groups, onGroupsUpdate }: VariantAnalysisProps
   const [error, setError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
-  const hasAutoTriggered = useRef(false);
-
-  // Auto-trigger on mount if there are products needing analysis
-  useEffect(() => {
-    if (hasAutoTriggered.current) return;
-    const needsAnalysis = groups.some(
-      (g) => classifyGroup(g) === 'has_attrs' && !g.variantAnalysisStatus && !g.variantAnalysisSkipped
-    );
-    if (needsAnalysis) {
-      hasAutoTriggered.current = true;
-      handleAnalyzeAll();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function callAnalyzeAPI(
     batch: ProductGroup[],
