@@ -134,7 +134,7 @@ export function isRequiredColumn(col: string): boolean {
 // Default column mappings
 export const DEFAULT_MAPPINGS: ColumnMapping[] = [
   { targetColumn: '*分类id\n（必填）', sourceColumn: null, transform: 'none', description: '通过TikTok API获取或手动输入' },
-  { targetColumn: '*产品标题\n（必填）', sourceColumn: '商品名称1', transform: 'none' },
+  { targetColumn: '*产品标题\n（必填）', sourceColumn: '商品名称', transform: 'none' },
   { targetColumn: '*产品描述\n（必填）', sourceColumn: '商品描述', transform: 'none' },
   { targetColumn: '品牌', sourceColumn: null, transform: 'fixedValue', fixedValue: '无品牌' },
   { targetColumn: '产品属性', sourceColumn: null, transform: 'none' },
@@ -233,7 +233,7 @@ export const STORE_BACKEND_TARGET_COLUMN_DISPLAY: Record<string, string> = {
 export const STORE_BACKEND_DEFAULT_MAPPINGS: ColumnMapping[] = [
   { targetColumn: '类目', sourceColumn: null, transform: 'none', description: '由 TikTok 类目推荐填充' },
   { targetColumn: '品牌', sourceColumn: null, transform: 'fixedValue', fixedValue: '无品牌' },
-  { targetColumn: '商品名称', sourceColumn: '商品名称1', transform: 'none' },
+  { targetColumn: '商品名称', sourceColumn: '商品名称', transform: 'none' },
   { targetColumn: '商品描述', sourceColumn: '商品描述', transform: 'none' },
   { targetColumn: '主图', sourceColumn: '商品主图', transform: 'none' },
   { targetColumn: '图片 2', sourceColumn: '商品图片2', transform: 'none' },
